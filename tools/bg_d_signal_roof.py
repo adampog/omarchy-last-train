@@ -15,6 +15,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import scenes as tk  # noqa: E402
+import roughs as rg  # noqa: E402
 import city  # noqa: E402
 from scenes import srgb  # noqa: E402
 from roughs import P, STEEL, DECK, RED, MIST, SKY, SEEDS, far, look  # noqa: E402
@@ -65,7 +66,11 @@ def build(rng):
                                 for k in range(40)]], 0.03, steel, cyclic=True)
         city.tube("dish_post", [[(x, y + 0.2, ROOF_Z), (x, y + 0.2, zz)]], 0.04, steel)
         city.tube("dish_arm", [[(x, y + 0.2, zz), (x + 0.1, y - 0.6, zz + 0.3)]], 0.02, steel)
-    far(rng, count=420, near=110, heights=(30, 76), spread=65, top=110.0, glow_strength=0.036, tall=0.0)
+    # three rows of city, each its own mass; the painter draws the haze bands between them
+    mat = city.facade("far", rg.BODY_FAR, rg.GLASS, rg.WIN_A, rg.WIN_B, rg.WIN_WARM, bay=3.5, floor_h=4.0, lit=0.08,
+                      strength=0.9, warm_part=0.2, ground=6.0)
+    for near, far_, count, heights in ((110, 190, 16, (30, 60)), (230, 420, 60, (45, 85)), (480, 900, 90, (55, 110))):
+        city.skyline(rng, mat, None, count, near, far_, 65, heights, tall=0.0)
     tk.set_world(srgb(SKY), 0.1)
     look(eye, 28, 900)
 
