@@ -31,7 +31,7 @@ The backgrounds are painted, not rendered as pictures. Blender renders each scen
 flat local colour and one flat shadow tone per surface, windows drawn unevenly on the walls, pen lines on edges
 that wander a pixel or two and hesitate at corners, cast shadows with a hand-cut edge, drawn lamps and halos
 with a wide soft body of light in the air round the key lamp, a far city that sinks into banded haze, smears on
-wet ground, steam as a low wide cut shape, rain streaks, uneven pigment in the colour fields, a darker top edge
+wet ground, steam as a thin low veil with a ragged cut edge that the street shows through, rain streaks, uneven pigment in the colour fields, a darker top edge
 and one even grain. All of it comes
 from seeded noise and the colours in `colors.toml`.
 

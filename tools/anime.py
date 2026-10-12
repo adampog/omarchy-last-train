@@ -45,6 +45,7 @@ HAZE_FAR = tk.mix(SEL, BLUE, 0.45)
 LINE = tk.mix(BG, SEL, 0.06)
 SKYLIGHT = P["blue"]
 RAIN = tk.mix(P["foreground"], P["bright_blue"], 0.35)
+STEAM = tk.mix(SEL, P["muted"], 0.85)    # what steam lifts the ground's tone toward
 
 # local colours for a scene's surfaces, lifted from near-black to painted blues
 BODY = tk.mix(BG, SEL, 0.32)
@@ -99,6 +100,9 @@ class Look:
     rain_far: float = 0.0         # beyond this distance there is a little less rain; 0 for the same everywhere
     body: tuple = ()              # the key's light in the air: (radius in metres, amount), a wide soft field
     shade_wobble: float = 0.0     # how far the key's cast shadows wander from the ruler, in px
+    strokes: float = 0.0          # how far the smears on wet ground break into separate brush strokes
+    unshaded: object = None       # unshaded(pic) gives where the key's cast shadow is left out: a mask
+    no_ink: object = None         # no_ink(pic) gives how much of the pen line is taken off, 0 to 1 per pixel
     offset: float = 1000.0        # added to positions so the data render holds no negative numbers
     extra: dict = field(default_factory=dict)
 
@@ -390,6 +394,8 @@ def surfaces(pic, rng):
         band = pt.noise(pic.shape, (6 * k, 260 * k), rng) - 0.5
         r = np.where(pic.wet, r * (1 + look.ring_bands * band), r)
     lit = pic.lit
+    if look.unshaded:  # there the light falls wherever the surface faces it, whatever stands in the way
+        lit = lit | (look.unshaded(pic) & (pic.ndl > 0.06) & pic.solid & ~pic.flat)
     if look.shade_wobble:  # a cast shadow's edge is cut by hand too: it wanders, and stays on its own surface
         reach = look.shade_wobble * k * 2
         dy, dx = ((pt.noise(pic.shape, 90 * k, rng) - 0.5) * reach for _ in range(2))
@@ -427,8 +433,16 @@ def smears(pic, out, rng):
     from_row = np.round(hz - (rows - hz) * 1.7).astype(int)  # squeezed, so tall lights reach the near ground
     ok = (from_row >= 0) & (rows > hz)
     r = np.where(ok[:, None, None], lightmap[np.clip(from_row, 0, h - 1)], 0.0).astype(np.float32)
-    r = pt.blur(pt.blur(r, 60 * k, axes=(0,)), 2.5 * k, axes=(1,))
-    bands = 0.3 + 0.7 * pt.step(0.38, 0.56, pt.noise(pic.shape, (7 * k, 300 * k), rng))
+    r = pt.blur(r, 60 * k, axes=(0,))
+    gap = 0.3
+    if pic.look.strokes:  # a brush pulls the light down in strokes: each its own width, start, end and strength
+        s = pic.look.strokes
+        stroke = pt.step(0.36, 0.6, pt.noise(pic.shape, (320 * k, 20 * k), rng)) \
+            * (0.55 + 0.45 * pt.noise(pic.shape, (150 * k, 50 * k), rng))
+        r = r * (1 - s + s * 1.3 * stroke)[..., None]
+        gap = 0.3 * (1 - s)
+    r = pt.blur(r, (5.0 if pic.look.strokes else 2.5) * k, axes=(1,))
+    bands = gap + (1 - gap) * pt.step(0.38, 0.56, pt.noise(pic.shape, (7 * k, 300 * k), rng))
     local = pt.luma(pic.col)
     puddle = local < pt.blur(local, 40 * k) * 0.93  # the darker patches of the ground are standing water
     wet = bands * np.where(puddle, 1.0, 0.6)
@@ -459,6 +473,8 @@ def lines(pic, out, rng, width=1.0):
     for g, m in zip(pic.look.glows, pic.masks):
         if g.style != "flat":
             line *= 1 - np.clip(m * 2, 0, 1)
+    if pic.look.no_ink:
+        line = line * (1 - np.clip(pic.look.no_ink(pic), 0, 1))
     return pt.mixa(out, pt.rgb(LINE), line * 0.9)
 
 
@@ -508,6 +524,26 @@ def finish(pic, out, rng, amount=0.014):
     y = np.arange(h, dtype=np.float32)[:, None] / pic.k
     out = out * (0.3 + 0.7 * pt.step(30, 480, y))[..., None]
     return pt.grain(out, amount, rng)
+
+
+def steam(pic, out, rng, at, size, lit, toward=-1, opacity=0.45, lift=0.45, notch=0.6, trail=0.9, lobes=3):
+    """Steam as a veil, for a scene's `over`: a low ragged shape rising at `at` and trailing along the ground away
+    from the light, thin enough that what is behind shows through. Its tone is the ground's own, lifted a little;
+    only the rim toward the light is bright, in the colour `lit`. `size` is one lobe's half width and its height
+    in metres. Things nearer than it stay clear of it. Keep it beside a lamp, never in front of one."""
+    k = pic.k
+    row, col = pic.at(at)
+    reach = float(np.linalg.norm(np.array(at, np.float32) - pic.eye))
+    per_m = pic.f / reach
+    behind = pic.dist > reach - 0.5
+    body, rim, _ = pt.puff(pic.shape, (row, col), size[0] * per_m, size[1] * per_m, rng, lobes=lobes, toward=toward,
+                           notch=notch, trail=trail, points=15)
+    ground = pt.blur(out, 30 * k)  # the tone of what it lies over
+    tone = pt.mixa(ground, pt.rgb(STEAM), lift)
+    shape = pt.blur((body > 0).astype(np.float32), 0.8 * k)  # the cut edge stays; only the rim's inner side is soft
+    out = pt.mixa(out, tone, pt.blur(body, 0.8 * k) * opacity * behind)
+    glow = np.clip(pt.blur(rim, size[0] * per_m * 0.12) * 1.6, 0, 1) * shape
+    return pt.mixa(out, pt.rgb(lit), glow * opacity * behind)
 
 
 def wander(pic, out, rng):

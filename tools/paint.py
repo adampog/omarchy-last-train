@@ -246,16 +246,18 @@ def plume(shape, at, height, width, rng, lean=0.2, toward=-1, points=9):
     return body * fade[:, None].astype(np.float32), lit
 
 
-def puff(shape, at, width, height, rng, lobes=3, toward=-1, points=11):
+def puff(shape, at, width, height, rng, lobes=3, toward=-1, points=11, notch=0.0, trail=0.0):
     """Steam as a low wide puff cut by hand: a few lobes rising and spreading from `at` (row, column), each a
     ragged many-sided shape. It is never drawn taller than twice its width, so it cannot read as a figure.
     Returns the shape (0 to 1, thinner toward the top), its edge on the side toward the light (`toward` is -1 for
-    left, 1 for right) and a smaller inner shape on the side away from it."""
+    left, 1 for right) and a smaller inner shape on the side away from it. `notch` cuts two or three sharp
+    notches this deep into each lobe's edge. With `trail` the lobes do not climb: the first sits over `at` and
+    the rest lie lower and smaller along the ground, away from the light, this many widths apart."""
     h, w = shape
     y0, x0 = at
     height = min(height, 2 * width)
     lo_y, hi_y = max(0, int(y0 - height * 1.25)), min(h, int(y0) + 1)
-    lo_x, hi_x = max(0, int(x0 - width)), min(w, int(x0 + width))
+    lo_x, hi_x = max(0, int(x0 - width * (1 + 2 * trail))), min(w, int(x0 + width * (1 + 2 * trail)))
     out = [np.zeros(shape, np.float32) for _ in range(3)]
     if hi_y <= lo_y or hi_x <= lo_x:
         return out
@@ -267,7 +269,14 @@ def puff(shape, at, width, height, rng, lobes=3, toward=-1, points=11):
         cx = x0 + width * (side + rng.uniform(-0.06, 0.06))
         cy = y0 - height * (0.2 + 0.5 * t)
         rx, ry = width * (0.3 + 0.18 * t), height * (0.26 + 0.14 * t)
+        if trail:
+            cx = x0 - toward * width * trail * i + width * rng.uniform(-0.08, 0.08)
+            cy = y0 - height * (0.46 - 0.24 * t)
+            rx, ry = width * (0.62 - 0.16 * t), height * (0.5 - 0.22 * t)
         cut = rng.uniform(0.66, 1.24, points)
+        if notch:
+            for at_point in rng.choice(points, int(rng.integers(2, 4)), replace=False):
+                cut[at_point] *= 1 - notch
         turn = (np.arctan2(yy - cy, xx - cx) / (2 * np.pi) + 0.5) * points
         j = turn.astype(int) % points
         edge = cut[j] + (cut[(j + 1) % points] - cut[j]) * (turn - np.floor(turn))
@@ -278,6 +287,8 @@ def puff(shape, at, width, height, rng, lobes=3, toward=-1, points=11):
     # the inner tone is the whole shape again, set in from the light and down: one shadow, not a spot per lobe
     inner = np.roll(body, (int(height * 0.16), toward * -2 * d), (0, 1)) & (yy < y0 - 1)
     fade = np.clip(1 - 0.6 * (y0 - yy) / max(height, 1.0), 0, 1)
+    if trail:  # and it thins as it trails away
+        fade = fade * np.clip(1 - 0.5 * np.abs(xx - x0) / (width * (1 + trail * (lobes - 1))), 0, 1)
     for a, part in zip(out, (body * fade, lit, inner & body)):
         a[lo_y:hi_y, lo_x:hi_x] = part
     return out

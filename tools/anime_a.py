@@ -29,14 +29,13 @@ import bg_a_rain_gate as a  # noqa: E402
 
 P = tk.palette()
 RED = P["accent"]
-STEAM = tk.mix(tk.mix(an.SEL, P["muted"], 0.5), P["accent"], 0.14)                      # the body of the steam
-STEAM_IN = tk.mix(STEAM, an.SEL, 0.4)                 # its darker inner tone
-STEAM_LIT = tk.mix(tk.mix(P["muted"], P["bright_red"], 0.5), P["foreground"], 0.25)  # the side toward the sign
+STEAM_LIT = tk.mix(tk.mix(P["muted"], P["bright_red"], 0.62), P["foreground"], 0.2)  # the side toward the sign
 WIN_DARK = tk.mix(an.BG, an.SEL, 0.13)
 WIN_EDGE = tk.mix(an.BODY, P["blue"], 0.32)
 WIN_COOL = tk.mix(an.SEL, P["bright_blue"], 0.4)
 BOLLARD, BOLLARD_LIT = tk.mix(an.BG, an.SEL, 0.2), tk.mix(tk.mix(an.BG, an.SEL, 0.4), RED, 0.3)
 PLATE = tk.mix(an.BG, an.SEL, 0.1)
+PATCH_LIGHT = tk.mix(tk.mix(an.SEL, P["muted"], 0.4), RED, 0.3)  # bare render where the paint has flaked
 
 # the scene's own local colours, lifted from near-black to painted blues
 a.BODY, a.GLASS, a.ROAD, a.PAVE, a.STEEL = an.BODY, an.GLASS, an.ROAD, an.PAVE, an.STEEL
@@ -48,7 +47,7 @@ DRAIN = ((-0.56, 17.0), (-0.04, 18.3))    # in the road against the left kerb, s
 WALL_X = -5.6                             # the left wall's face
 VENT = ((-5.6, 17.6, 5.9), (-5.46, 18.4, 6.4))
 PATCH = (12.6, 5.3, 1.5, 0.75)            # a flaked patch on the left wall: centre y, z and half sizes
-STEAM_SIZE = (3.0, 2.6)                   # the steam's half width and its height, in metres
+STEAM_SIZE = (1.5, 1.5)                   # one lobe of the steam: its half width and its height, in metres
 
 
 def incident():
@@ -154,31 +153,22 @@ def drawn(pic, out, rng):
     py, pz, ry, rz = PATCH
     ragged = 1 + 0.7 * (pt.noise(pic.shape, 26 * k, rng) - 0.5)
     reach = np.hypot((y - py) / ry, (z - pz) / rz) * ragged
-    out = pt.mixa(out, pt.rgb(an.LINE), (wall & (reach < 1)) * 0.3)
+    out = pt.mixa(out, pt.rgb(an.LINE), (wall & (reach < 1)) * 0.42)
     bare = np.hypot((y - py - 0.25) / ry, (z - pz + 0.1) / rz) * ragged < 0.5
-    out = pt.mixa(out, pt.rgb(WIN_EDGE), (wall & bare) * 0.3)
+    out = pt.mixa(out, pt.rgb(PATCH_LIGHT), (wall & bare) * 0.6)
     (_, v0, vz), (_, v1, _) = VENT
-    run = (vz - z) / 2.2  # 0 under the vent to 1 where the stain gives out
-    wide = 0.16 + 0.3 * run * pt.noise(pic.shape, (60 * k, 14 * k), rng)
+    run = (vz - z) / 3.4  # 0 under the vent to 1 where the stain gives out
+    wide = 0.22 + 0.3 * run * pt.noise(pic.shape, (60 * k, 14 * k), rng)
     stain = wall & (run > 0) & (run < 0.55 + 0.45 * pt.noise(pic.shape, (400 * k, 10 * k), rng)) \
         & (np.abs(y - (v0 + v1) / 2) < wide)
-    out = pt.mixa(out, pt.rgb(an.LINE), stain * 0.26)
+    out = pt.mixa(out, pt.rgb(an.LINE), stain * 0.55)
     return out
 
 
 def steam(pic, out, rng):
-    """Steam over the grate: a low wide puff of three lobes cut by hand, a darker inner tone, pink on the side
-    toward the sign, thinner toward the top. Wider than it is tall, so it never reads as a figure. No rim."""
-    k = pic.k
-    row, col = pic.at(GRATE)
-    per_m = pic.f / GRATE[1]
-    behind = pic.dist > GRATE[1] - 0.5
-    body, lit, inner = pt.puff(pic.shape, (row, col), STEAM_SIZE[0] * per_m, STEAM_SIZE[1] * per_m, rng)
-    soft = 1.0 * k
-    out = pt.mixa(out, pt.rgb(STEAM), pt.blur(body, soft) * 0.55 * behind)
-    out = pt.mixa(out, pt.rgb(STEAM_IN), pt.blur(inner * (lit < 0.5), soft) * 0.2 * behind)
-    out = pt.mixa(out, pt.rgb(STEAM_LIT), pt.blur(body * lit, soft) * 0.5 * behind)
-    return out
+    """Steam over the grate as a thin veil: one low ragged lobe above it and two trailing along the road away
+    from the sign, the street showing through, pink only on the rim toward the sign. The far lamp stays clear."""
+    return an.steam(pic, out, rng, GRATE, STEAM_SIZE, STEAM_LIT)
 
 
 LOOK = an.Look(
