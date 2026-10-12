@@ -1,0 +1,33 @@
+mode = "dark"
+
+# Red is the accent, blue is the selection
+accent = "#ff3b30"
+selection = "#1c3f8f"
+muted = "#8089a8"
+
+# Blue-black
+background = "#0a0a0f"
+dark_background = "#0a0a0f"
+darker_background = "#0a0a0f"
+lighter_background = "#15151c"
+
+foreground = "#f2ece4"
+dark_foreground = "#b8b3aa"
+light_foreground = "#d8d2c8"
+bright_foreground = "#f2ece4"
+
+red = "#ff3b30"
+yellow = "#fcb362"
+orange = "#fa9d5a"
+green = "#5fd38a"
+cyan = "#6cc7e6"
+blue = "#4d8fe6"
+magenta = "#ff6ea0"
+brown = "#c27a5c"
+
+bright_red = "#ff6b5f"
+bright_yellow = "#ffd089"
+bright_green = "#9fe8b0"
+bright_cyan = "#9adcf2"
+bright_blue = "#7fb6ef"
+bright_magenta = "#ff9ac2"
