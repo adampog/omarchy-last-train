@@ -148,7 +148,7 @@ def under(pic, out, rng):
     # the wall's warm glow over the mouth: one flat low wide patch, edged in a few straight hand-cut segments
     ytop = np.interp(x, (-21, -15, -10, -5, 1), (8.0, 9.0, 9.6, 9.0, 8.1))
     patch = front & (z > 7.85) & (z < ytop) & (x > -21) & (x < 1)
-    out = pt.mixa(out, pt.rgb(PATCH), patch * 0.4 * np.clip((rows - 150 * k) / (200 * k), 0, 1))
+    out = pt.mixa(out, pt.rgb(PATCH), patch * 0.0 * np.clip((rows - 150 * k) / (200 * k), 0, 1))
     # the mouth's far end: a soft warm gradient, brightest low and in the middle, not a flat field
     (t0, l0), (b0, r0) = pic.at((-15.4, 46.0, 7.0)), pic.at((-5.4, 46.0, 0.0))
     mouth = (rows > t0) & (rows < b0) & (cols > l0) & (cols < r0) & (pic.dist > 150)
@@ -170,7 +170,7 @@ def under(pic, out, rng):
     # the mouth's light on the wet road: vertical smears cut by bands of plain dark road
     wet = road(pic)
     r0r = pic.at((-10.4, 46.0, 0.0))[0]
-    strip = np.floor(np.log1p(np.maximum(rows - r0r, 0) / (16 * k)) * 5).astype(int)
+    strip = np.floor(np.log1p(np.maximum(rows - r0r, 0) / (24 * k)) * 4).astype(int)
     sid = strip % 64
     gap = rng.random(64)[sid] < 0.4
     # broken horizontal smears: each band of the road has its own run of lit stretches
@@ -179,7 +179,11 @@ def under(pic, out, rng):
     keep = rng.random((64, 600))[sid, col_id % 600] > 0.45
     reach = np.clip(1 - np.abs(cols - cx) / (520 * k), 0, 1) ** 0.7 * np.clip(1 - (rows - r0r) / (700 * k), 0, 1)
     smear = (np.clip(rows - r0r, 0, None) > 0) * (1 - gap * 0.7) * keep * reach
-    smear = pt.blur(smear.astype(np.float32), 1.6 * k)
+    smear = smear.astype(np.float32)
+    wide = smear.copy()  # each smear stretched sideways so its blocks run together
+    for sh in range(6, int(60 * k) + 1, 6):
+        wide = np.maximum(wide, np.maximum(np.roll(smear, sh, 1), np.roll(smear, -sh, 1)))
+    smear = pt.blur(wide, 2.0 * k)
     # the lip lamps' red: two short smears
     red = np.zeros(pic.shape, np.float32)
     for lx in (-13.8, -7.0):
@@ -193,7 +197,7 @@ def under(pic, out, rng):
     pw = (pt.noise(pic.shape, (40 * k, 120 * k), rng) - 0.5) * 60 * k
     pool = wet & (np.abs(cols - cx + pw) < (r0 - l0) * 0.75) & (rows < r0r + 300 * k + pw)
     out = pt.mixa(out, pt.rgb(POOL), pt.blur(pool.astype(np.float32), 5 * k) * 0.45)
-    out = pt.mixa(out, pt.rgb(tk.mix(ORANGE, PALE, 0.2)), (smear * wet * 0.4).astype(np.float32))
+    out = pt.mixa(out, pt.rgb(tk.mix(ORANGE, PALE, 0.2)), (smear * wet * 0.5).astype(np.float32))
     out = pt.mixa(out, pt.rgb(an.BG), (front * 0.0).astype(np.float32))
     # two depth tones in the towers: the nearer ones a step darker
     tower = pic.solid & (z > 14.1) & ~pic.flat
@@ -209,7 +213,7 @@ LOOK = an.Look(
            an.Glow(an.within((-14.2, 45.0, 7.9), (-6.6, 45.8, 8.5)), "paper", core=1.5, halo=((9, 2.5),), colour=RED)),
     discs=((F_AT, (9.0, 18.0), (0.34, 0.16), ORANGE),),
     tier_at=(250.0, 450.0, 650.0), veil=((80.0, 0.2), (130.0, 0.36)), tint=0.35, wet=road, dress=dress, under=under,
-    unshaded=front_wall, no_ink=top_line, rain_thin=thin_rain,
+    unshaded=front_wall, disc_sky=True, no_ink=top_line, rain_thin=thin_rain,
     rain=0.45, rain_colour=tk.mix(PALE, ORANGE, 0.3), wobble=1.6, hesitate=True, cut=3.0, ring_bands=0.5,
     body=(20.0, 0.34), shade_wobble=3.0, air=((130, 0.2), (70, 0.4), (30, 0.58)))
 
