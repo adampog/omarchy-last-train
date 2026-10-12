@@ -98,7 +98,7 @@ def under(pic, out, rng):
     top1 = np.interp(cols, np.array((1990, 2200, 2450, 2650, 2900)) * k, np.array((300, 332, 288, 322, 296)) * k)
     top2 = np.interp(cols, np.array((1990, 2250, 2500, 2800, 3200)) * k, np.array((338, 312, 350, 318, 346)) * k)
     end1 = np.interp(rows, np.array((300, 560, 820, 1100)) * k, np.array((2900, 2965, 2915, 2870)) * k)
-    end2 = np.interp(rows, np.array((330, 600, 850, 1100)) * k, np.array((3200, 3270, 3225, 3170)) * k)
+    end2 = np.interp(rows, np.array((330, 560, 800, 1100)) * k, np.array((3190, 3300, 3250, 3130)) * k)
     in1 = (cols > 1990 * k) & (cols < end1) & (rows > top1) & (rows < 1100 * k)
     in2 = (cols > 1990 * k) & (cols < end2) & (rows > top2) & (rows < 1100 * k)
     out = pt.mixa(out, pt.rgb(tk.mix(ORANGE, an.SEL, 0.3)), (surf * in2 * FIELD2).astype(np.float32))
