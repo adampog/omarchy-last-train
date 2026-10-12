@@ -246,6 +246,43 @@ def plume(shape, at, height, width, rng, lean=0.2, toward=-1, points=9):
     return body * fade[:, None].astype(np.float32), lit
 
 
+def puff(shape, at, width, height, rng, lobes=3, toward=-1, points=11):
+    """Steam as a low wide puff cut by hand: a few lobes rising and spreading from `at` (row, column), each a
+    ragged many-sided shape. It is never drawn taller than twice its width, so it cannot read as a figure.
+    Returns the shape (0 to 1, thinner toward the top), its edge on the side toward the light (`toward` is -1 for
+    left, 1 for right) and a smaller inner shape on the side away from it."""
+    h, w = shape
+    y0, x0 = at
+    height = min(height, 2 * width)
+    lo_y, hi_y = max(0, int(y0 - height * 1.25)), min(h, int(y0) + 1)
+    lo_x, hi_x = max(0, int(x0 - width)), min(w, int(x0 + width))
+    out = [np.zeros(shape, np.float32) for _ in range(3)]
+    if hi_y <= lo_y or hi_x <= lo_x:
+        return out
+    yy, xx = np.mgrid[lo_y:hi_y, lo_x:hi_x].astype(np.float32)
+    body, inner = np.zeros(yy.shape, bool), np.zeros(yy.shape, bool)
+    for i in range(lobes):
+        t = i / max(lobes - 1, 1)                      # the first lobe sits on the ground, the last is the top
+        side = (i % 2 * 2 - 1) * (0.1 + 0.22 * t)      # they step to one side and the other as they climb
+        cx = x0 + width * (side + rng.uniform(-0.06, 0.06))
+        cy = y0 - height * (0.2 + 0.5 * t)
+        rx, ry = width * (0.3 + 0.18 * t), height * (0.26 + 0.14 * t)
+        cut = rng.uniform(0.66, 1.24, points)
+        turn = (np.arctan2(yy - cy, xx - cx) / (2 * np.pi) + 0.5) * points
+        j = turn.astype(int) % points
+        edge = cut[j] + (cut[(j + 1) % points] - cut[j]) * (turn - np.floor(turn))
+        reach = np.hypot((xx - cx) / rx, (yy - cy) / ry) / edge
+        body |= reach < 1
+    d = max(2, int(width * 0.2))
+    lit = body & ~np.roll(body, -toward * d, 1)        # a strip of even width along the edge that faces the light
+    # the inner tone is the whole shape again, set in from the light and down: one shadow, not a spot per lobe
+    inner = np.roll(body, (int(height * 0.16), toward * -2 * d), (0, 1)) & (yy < y0 - 1)
+    fade = np.clip(1 - 0.6 * (y0 - yy) / max(height, 1.0), 0, 1)
+    for a, part in zip(out, (body * fade, lit, inner & body)):
+        a[lo_y:hi_y, lo_x:hi_x] = part
+    return out
+
+
 def grain(a, amount, rng):
     """One even grain over the whole picture, the same everywhere, so it reads as paper."""
     g = rng.standard_normal(a.shape[:2], dtype=np.float32)

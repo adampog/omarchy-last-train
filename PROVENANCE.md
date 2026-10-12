@@ -24,8 +24,10 @@ The backgrounds are painted, not rendered as pictures. Blender renders each scen
 (local colour, emission, position, surface direction and a hard shadow mask from the one key light), and
 `tools/anime.py` paints the picture from that data in numpy: a gradient sky, stepped far-city silhouettes, one
 flat local colour and one flat shadow tone per surface, windows drawn unevenly on the walls, pen lines on edges
-that wander a pixel or two and hesitate at corners, drawn lamps and halos, smears on wet
-ground, rain streaks, uneven pigment in the colour fields, a darker top edge and one even grain. All of it comes
+that wander a pixel or two and hesitate at corners, cast shadows with a hand-cut edge, drawn lamps and halos
+with a wide soft body of light in the air round the key lamp, a far city that sinks into banded haze, smears on
+wet ground, steam as a low wide cut shape, rain streaks, uneven pigment in the colour fields, a darker top edge
+and one even grain. All of it comes
 from seeded noise and the colours in `colors.toml`.
 
 Each new image gets a row here in the commit that adds it. Final file names are given when the set is chosen.

@@ -3,7 +3,7 @@
 The street, sign, camera and far city are the ones in bg_a_rain_gate.py. The renderer writes only data and the
 picture is painted from it by anime.py; this file says what in the scene is the key light, what glows and how,
 and adds the scene's own drawn things: the windows, the steam over the grate, the bollards as two flat tones,
-and a little incident near the sign (a downpipe, a blank blade sign, pavement seams, a drain, a puddle's edge).
+and a little incident near the sign (a downpipe, a blank blade sign, pavement seams, a drain, and on the left wall a vent, a pipe run, a flaked patch and a stain).
 
 Original art from geometry, procedural shaders and seeded noise. Every colour is a colors.toml value or a mix.
 
@@ -29,8 +29,8 @@ import bg_a_rain_gate as a  # noqa: E402
 
 P = tk.palette()
 RED = P["accent"]
-STEAM = tk.mix(an.SEL, P["muted"], 0.42)                      # the body of the steam
-STEAM_IN = tk.mix(an.SEL, P["muted"], 0.2)                    # its darker inner tone
+STEAM = tk.mix(tk.mix(an.SEL, P["muted"], 0.5), P["accent"], 0.14)                      # the body of the steam
+STEAM_IN = tk.mix(STEAM, an.SEL, 0.4)                 # its darker inner tone
 STEAM_LIT = tk.mix(tk.mix(P["muted"], P["bright_red"], 0.5), P["foreground"], 0.25)  # the side toward the sign
 WIN_DARK = tk.mix(an.BG, an.SEL, 0.13)
 WIN_EDGE = tk.mix(an.BODY, P["blue"], 0.32)
@@ -45,7 +45,10 @@ LAMP_AT = ((a.SIGN_X[0] + a.SIGN_X[1] - 0.05) / 2, a.SIGN_Y - 0.9, 5.2)
 GRATE = (3.4, 28.0, 0.0)
 BOLLARDS = ((-1.2, 2.7, 0.17), (-0.8, 4.2, 1.2))
 DRAIN = ((-0.56, 17.0), (-0.04, 18.3))    # in the road against the left kerb, short of the sign
-PUDDLE = (3.6, 15.5, 1.5, 1.7)            # centre x, y and half sizes, on the road this side of the sign
+WALL_X = -5.6                             # the left wall's face
+VENT = ((-5.6, 17.6, 5.9), (-5.46, 18.4, 6.4))
+PATCH = (12.6, 5.3, 1.5, 0.75)            # a flaked patch on the left wall: centre y, z and half sizes
+STEAM_SIZE = (3.0, 2.6)                   # the steam's half width and its height, in metres
 
 
 def incident():
@@ -56,7 +59,21 @@ def incident():
     for z in (1.4, 4.6, 7.8, 10.4):  # its brackets
         B.box((-5.6, 21.18, z), (-5.36, 21.42, z + 0.08))
     B.box((-5.6, 15.02, 4.55), (-4.8, 15.06, 4.63))  # the blade sign's arm
+    for y in (16.4, 18.6, 20.6):  # clips of the pipe run
+        B.box((-5.6, y - 0.05, 7.48), (-5.4, y + 0.05, 7.72))
     B.done("incident_steel", steel)
+    # a pipe run along the left wall above the awnings, turning into the wall, and a vent under it
+    city.tube("pipe_run", [[(-5.47, 21.3, 7.6), (-5.47, 15.6, 7.6), (-5.47, 15.6, 7.1), (-5.62, 15.6, 7.1)]], 0.06,
+              steel)
+    V = city.Boxes()
+    V.box(*VENT)
+    V.done("vent", city.plain("vent", PLATE, roughness=0.5))
+    L = city.Boxes()  # its slats
+    (x0, y0, z0), (x1, y1, z1) = VENT
+    for i in range(3):
+        z = z0 + 0.1 + 0.13 * i
+        L.box((x1, y0 + 0.08, z), (x1 + 0.01, y1 - 0.08, z + 0.05))
+    L.done("vent_slats", steel)
     S = city.Boxes()
     S.box((-5.5, 15.0, 3.55), (-4.85, 15.08, 4.5))
     S.done("blade", city.plain("blade", PLATE, roughness=0.5))
@@ -106,7 +123,7 @@ def dress(pic, rng):
 
 
 def drawn(pic, out, rng):
-    """Under the lines: the bollards' lit side, the pavement's seams, the drain and the puddle's edge."""
+    """Under the lines: the bollards' lit side, the pavement's seams, the drain, and the left wall's patch and stain."""
     k = pic.k
     x, y, z = pic.pos[..., 0], pic.pos[..., 1], pic.pos[..., 2]
     bollard = pic.solid & an.inbox(pic.pos, *BOLLARDS)
@@ -131,33 +148,36 @@ def drawn(pic, out, rng):
     rim |= drain != np.roll(drain, 1, 1)
     out = pt.mixa(out, pt.rgb(an.LINE), pt.ink(rim, np.ones(pic.shape, np.float32), k, rng, 0.8) * 0.8)
 
-    cx, cy, rx, ry = PUDDLE
-    reach = np.hypot((x - cx) / rx, (y - cy) / ry) * (1 + 0.5 * (pt.noise(pic.shape, 130 * k, rng) - 0.5))
-    puddle = road & (reach < 1)
-    out = pt.mixa(out, pt.rgb(an.SHADE), puddle * 0.14)
-    edge = (puddle != np.roll(puddle, 1, 0)) & road
-    far_side = edge & (y > cy + 0.3) & (x < cx + 0.6)  # only the far edge shows, where it catches the sign
-    out = pt.mixa(out, pt.rgb(tk.mix(P["bright_red"], P["foreground"], 0.3)),
-                  pt.blur(far_side.astype(np.float32), 0.8 * k) * 1.6 * (pt.noise(pic.shape, 50 * k, rng) > 0.4))
+
+    # on the left wall above the awnings: a flaked patch in two tones, and a stain run down from the vent
+    wall = pic.solid & (np.abs(x - WALL_X) < 0.05) & (pic.n[..., 0] > 0.5)
+    py, pz, ry, rz = PATCH
+    ragged = 1 + 0.7 * (pt.noise(pic.shape, 26 * k, rng) - 0.5)
+    reach = np.hypot((y - py) / ry, (z - pz) / rz) * ragged
+    out = pt.mixa(out, pt.rgb(an.LINE), (wall & (reach < 1)) * 0.3)
+    bare = np.hypot((y - py - 0.25) / ry, (z - pz + 0.1) / rz) * ragged < 0.5
+    out = pt.mixa(out, pt.rgb(WIN_EDGE), (wall & bare) * 0.3)
+    (_, v0, vz), (_, v1, _) = VENT
+    run = (vz - z) / 2.2  # 0 under the vent to 1 where the stain gives out
+    wide = 0.16 + 0.3 * run * pt.noise(pic.shape, (60 * k, 14 * k), rng)
+    stain = wall & (run > 0) & (run < 0.55 + 0.45 * pt.noise(pic.shape, (400 * k, 10 * k), rng)) \
+        & (np.abs(y - (v0 + v1) / 2) < wide)
+    out = pt.mixa(out, pt.rgb(an.LINE), stain * 0.26)
     return out
 
 
 def steam(pic, out, rng):
-    """Steam over the grate: two tall flat shapes cut by hand, a darker inner tone, lighter on the side toward
-    the sign, thinner as they climb and gone at the top. No rim."""
+    """Steam over the grate: a low wide puff of three lobes cut by hand, a darker inner tone, pink on the side
+    toward the sign, thinner toward the top. Wider than it is tall, so it never reads as a figure. No rim."""
     k = pic.k
     row, col = pic.at(GRATE)
-    top = pic.at((GRATE[0], GRATE[1], 8.2))[0]
+    per_m = pic.f / GRATE[1]
     behind = pic.dist > GRATE[1] - 0.5
-    for height, width, lean, shift, amount in ((row - top, 50 * k, 0.2, 0, 0.58), ((row - top) * 0.55, 34 * k, 0.1,
-                                                                                  34 * k, 0.45)):
-        body, lit = pt.plume(pic.shape, (row, col + shift), height, width, rng, lean=lean, toward=-1, points=11)
-        inner, _ = pt.plume(pic.shape, (row, col + shift + 8 * k), height * 0.8, width * 0.45, rng, lean=lean,
-                            toward=-1, points=8)
-        soft = 0.8 * k
-        out = pt.mixa(out, pt.rgb(STEAM), pt.blur(body, soft) * amount * behind)
-        out = pt.mixa(out, pt.rgb(STEAM_LIT), pt.blur(body * lit, soft) * amount * 0.85 * behind)
-        out = pt.mixa(out, pt.rgb(STEAM_IN), pt.blur(inner * (body > 0) * (lit < 0.5), soft) * amount * 0.5 * behind)
+    body, lit, inner = pt.puff(pic.shape, (row, col), STEAM_SIZE[0] * per_m, STEAM_SIZE[1] * per_m, rng)
+    soft = 1.0 * k
+    out = pt.mixa(out, pt.rgb(STEAM), pt.blur(body, soft) * 0.55 * behind)
+    out = pt.mixa(out, pt.rgb(STEAM_IN), pt.blur(inner * (lit < 0.5), soft) * 0.2 * behind)
+    out = pt.mixa(out, pt.rgb(STEAM_LIT), pt.blur(body * lit, soft) * 0.5 * behind)
     return out
 
 
@@ -172,6 +192,7 @@ LOOK = an.Look(
     discs=((a.SIGN_MID, (4.6, 12.5), (0.3, 0.16), RED),),
     flats=((*BOLLARDS, BOLLARD),),
     dress=dress, under=drawn, over=steam, wobble=2.2, hesitate=True, cut=4.0, ring_bands=0.55,
+    body=(11.0, 0.24), shade_wobble=3.0,
     air=((130, 0.2), (70, 0.4), (30, 0.58)), rain=0.85, rain_far=45.0, rain_colour=tk.mix(P["foreground"], P["bright_red"], 0.35))
 
 

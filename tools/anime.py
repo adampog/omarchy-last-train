@@ -97,6 +97,8 @@ class Look:
     ring_bands: float = 0.0       # how far wet ground breaks the rings of the key's light into bands
     air: tuple = ()               # the far city sinks into haze toward the ground: (below this height, amount)
     rain_far: float = 0.0         # beyond this distance there is a little less rain; 0 for the same everywhere
+    body: tuple = ()              # the key's light in the air: (radius in metres, amount), a wide soft field
+    shade_wobble: float = 0.0     # how far the key's cast shadows wander from the ruler, in px
     offset: float = 1000.0        # added to positions so the data render holds no negative numbers
     extra: dict = field(default_factory=dict)
 
@@ -299,8 +301,21 @@ class Picture:
                 out += pt.blur(src, sigma * k) * gain
         return out
 
-    def disc_light(self):
-        out = np.zeros(self.shape + (3,), np.float32)
+    def body(self):
+        """The key's light in the air: one wide field with no edge, brightest at the lamp, reaching further down
+        the picture (toward us, along the ground) than up into the sky. Things nearer than the lamp get less."""
+        if not self.look.body:
+            return np.zeros(self.shape, np.float32)
+        radius, amount = self.look.body
+        row, col = self.at(self.look.key_at)
+        reach = float(np.linalg.norm(np.array(self.look.key_at, np.float32) - self.eye))
+        yy, xx = np.ogrid[:self.shape[0], :self.shape[1]]
+        dy = (yy - row).astype(np.float32)
+        r = np.hypot(np.where(dy > 0, dy * 0.6, dy * 2.2), xx - col) * (reach / self.f) / radius
+        return np.exp(-r * r).astype(np.float32) * amount * np.where(self.dist > reach - 0.5, 1.0, 0.55)
+
+    def disc_light(self, body=1.0):
+        out = self.body()[..., None] * pt.rgb(self.look.key_colour) * body
         for spec, fields in zip(self.look.discs, self.discs):
             for f, amount in zip(fields, spec[2]):
                 out += f[..., None] * pt.rgb(spec[3]) * amount
@@ -338,11 +353,20 @@ def far_city(pic, out, rng):
         tone = pt.mixa(np.broadcast_to(pt.rgb(colour), out.shape), pt.rgb(SKYLIGHT), np.where(lamb > 0.4, 0.1, 0.0))
         out = np.where(m[..., None], tone, out)
     if pic.look.air:  # air: the foot of the far city is lost in tinted haze, in flat bands with a cut edge
-        z = pic.pos[..., 2] * (1 + 0.5 * (pt.noise(pic.shape, (40 * pic.k, 420 * pic.k), rng) - 0.5))
+        far = pic.far.astype(np.float32)
+        beyond = pic.far & (pic.dist >= at[1])  # only the nearest row keeps crisp stepped tops
+        soft = pt.blur(out, 2.2 * pic.k)
+        out = np.where(beyond[..., None], soft, out)
+        # the band edges are cut shapes: long slow rises with a shorter, sharper break laid over them
+        lift = 0.5 * (pt.noise(pic.shape, (40 * pic.k, 420 * pic.k), rng) - 0.5) \
+            + 0.3 * (np.round(pt.noise(pic.shape, (30 * pic.k, 110 * pic.k), rng) * 4) / 4 - 0.5)
+        z = pic.pos[..., 2] * (1 + lift)
         amount = np.zeros(pic.shape, np.float32)
         for height, a in pic.look.air:
             amount = np.where(z < height, a, amount)
-        out = pt.mixa(out, pt.rgb(HAZE_FAR), pt.blur(amount * pic.far, 1.5 * pic.k) * pic.far)
+        lowest = min(h for h, _ in pic.look.air)
+        amount = np.maximum(amount, 0.92 * (1 - pt.step(lowest * 0.15, lowest * 0.8, z)))  # the foot fades right in
+        out = pt.mixa(out, pt.rgb(HAZE_FAR), pt.blur(amount * far, 1.5 * pic.k) * far)
     return out
 
 
@@ -365,9 +389,15 @@ def surfaces(pic, rng):
     if look.ring_bands:  # on wet ground the light lies in broken horizontal bands, not a compass curve
         band = pt.noise(pic.shape, (6 * k, 260 * k), rng) - 0.5
         r = np.where(pic.wet, r * (1 + look.ring_bands * band), r)
+    lit = pic.lit
+    if look.shade_wobble:  # a cast shadow's edge is cut by hand too: it wanders, and stays on its own surface
+        reach = look.shade_wobble * k * 2
+        dy, dx = ((pt.noise(pic.shape, 90 * k, rng) - 0.5) * reach for _ in range(2))
+        lit = (pt.warp(lit.astype(np.float32)[..., None], dy, dx)[..., 0] > 0.5) & pic.solid & (pic.ndl > 0.06) \
+            & ~pic.flat
     f = np.zeros(pic.shape, np.float32)
     for edge, amount in zip(reversed(look.rings), reversed(look.amounts)):
-        f = np.where(pic.lit & (r < edge), amount, f)
+        f = np.where(lit & (r < edge), amount, f)
     f = pt.blur(f, look.cut * k)
     return pt.mixa(tone, pt.rgb(look.key_colour), f)
 
@@ -449,6 +479,7 @@ def lamps(pic, out):
     for spec, fields in zip(pic.look.discs, pic.discs):
         for f, amount in zip(fields, spec[2]):
             out = pt.mixa(out, pt.rgb(spec[3]), f * amount)
+    out = pt.mixa(out, pt.rgb(pic.look.key_colour), pic.body())
     return pt.screen(out, pic.halo)
 
 
@@ -458,7 +489,7 @@ def rain(pic, out, rng):
     amount = pic.look.rain
     if not amount:
         return out
-    halo = np.clip((pic.halo + pic.disc_light()).max(-1), 0, 1)
+    halo = np.clip((pic.halo + pic.disc_light(body=0.3)).max(-1), 0, 1)  # the wide body of light adds little rain
     density = 0.04 + 0.96 * np.clip(halo * 2.5, 0, 1)
     n = int(9000 * k * k * amount)
     r = (pt.streaks(pic.shape, density, n, 30 * k, 0.16, rng)

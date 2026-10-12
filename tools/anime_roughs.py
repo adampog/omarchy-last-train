@@ -223,12 +223,21 @@ def w_under(pic, out, rng):
     word = pic.solid & (pic.dist < 550)
     z = pic.pos[..., 2]
     lo, hi = z[word].min(), z[word].max()
-    cut = 0.32 + 0.14 * (pt.noise(pic.shape, (4000 * k, 240 * k), rng) - 0.5)
-    lit = (z - lo) / (hi - lo) < cut
+    # one straight shadow line on each letter, the same on all of them: the city's light from below reaches a
+    # little way up the face and its edge rises across the letter. Letters are told apart by the gaps between them.
+    cols = word.any(0)
+    starts = np.flatnonzero(cols & ~np.roll(cols, 1))
+    ends = np.flatnonzero(cols & ~np.roll(cols, -1))
+    across = np.zeros(pic.shape[1], np.float32)
+    for s, e in zip(starts, ends):
+        across[s:e + 1] = np.linspace(0, 1, e - s + 1)
+    lit = (z - lo) / (hi - lo) < (0.13 + 0.14 * across)[None, :]
     cool = pt.rgb(tk.mix(tk.mix(w6.UPLIGHT, w6.LETTER, 0.3), an.SEL, 0.3))
     dark = pt.rgb(tk.mix(tk.mix(w6.LETTER, an.SEL, 0.5), an.BG, 0.45))
     tone = np.where(lit[..., None], cool, dark)
-    tone = np.where((pic.n[..., 0] < -0.5)[..., None], pt.rgb(tk.mix(w6.LAMP, an.DEEP, 0.35)), tone)
+    # sides are one darker tone on every letter: the middle letters show no side, so none of them is red
+    tone = np.where((np.abs(pic.n[..., 0]) > 0.5)[..., None], pt.rgb(tk.mix(tk.mix(w6.LETTER, an.SEL, 0.5), an.BG, 0.7)),
+                    tone)
     tone = np.where((pic.n[..., 2] < -0.5)[..., None], pt.rgb(tk.mix(w6.UPLIGHT, PALE, 0.5)), tone)
     return np.where(word[..., None], tone, out)
 
