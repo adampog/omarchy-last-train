@@ -31,7 +31,7 @@ RED, ORANGE, PALE = P["accent"], P["orange"], P["foreground"]
 WIN_GLASS = tk.mix(an.SEL, P["blue"], 0.1)  # a step lighter than the wall it is in
 WIN_COOL = tk.mix(an.SEL, P["bright_blue"], 0.2)
 WIN_EDGE = tk.mix(an.SEL, P["blue"], 0.3)
-WIN_WARM = tk.mix(tk.mix(ORANGE, PALE, 0.3), an.SEL, 0.5)  # dimmer than the train's dimmest window
+WIN_WARM = tk.mix(tk.mix(ORANGE, PALE, 0.1), an.SEL, 0.62)  # dimmer than the train's dimmest window
 QUAY = tk.mix(tk.mix(an.BG, an.SEL, 0.3), P["blue"], 0.15)
 BOLLARD_LIT = tk.mix(tk.mix(an.BG, an.SEL, 0.45), ORANGE, 0.18)
 
@@ -60,7 +60,7 @@ def dress(pic, rng):
     """Windows on the four near towers, drawn; marks on the far city."""
     upright = an.walls(pic)[0]
     wall = upright & ~pic.far & (pic.pos[..., 1] > 95) & (pic.pos[..., 1] < 135)
-    an.windows(pic, rng, wall, bay=3.3, floor_h=3.6, ground=2.0, part=0.17, warm=0.55, glass=WIN_GLASS, edge=WIN_EDGE,
+    an.windows(pic, rng, wall, bay=3.3, floor_h=3.6, ground=2.0, part=0.17, warm=0.92, glass=WIN_GLASS, edge=WIN_EDGE,
                lit=WIN_WARM)
 
 
@@ -73,17 +73,21 @@ def under(pic, out, rng):
     wet = water(pic)
     # bands: rows grouped into strips of uneven height; some strips are dark water with no light in them
     r0 = pic.at((0.0, VY, WATER_Z))[0]
-    strip = np.floor(np.log1p(np.maximum(rows - r0, 0) / (14 * k)) * 7).astype(int)
+    strip = np.floor(np.log1p(np.maximum(rows - r0, 0) / (9 * k)) * 7).astype(int)
     gap = rng.random(64)[strip % 64] < 0.4
     # columns: smears the width of a window, each its own length
-    edges = np.cumsum(rng.uniform(8, 34, 400)) * k
+    edges = np.cumsum(rng.uniform(40, 150, 400)) * k
     col_id = np.searchsorted(edges, cols[0])[None, :]
-    keep = rng.random(512)[col_id % 512] > 0.4
+    keep = rng.random((64, 512))[strip % 64, col_id % 512] > 0.45  # each strip breaks at its own places
     near = np.clip(1 - np.abs(rows - r0) / (150 * k), 0, 1) * (1 - gap) * keep
     x0, x1 = pic.at((-21.0 + e.SHIFT, VY, 0))[1], pic.at((31.0 + e.SHIFT, VY, 0))[1]
     inside = ((cols > x0) & (cols < x1)).astype(np.float32)
     smear = (near * inside).astype(np.float32)
-    out = pt.mixa(out, pt.rgb(tk.mix(ORANGE, PALE, 0.25)), smear * wet * 0.34)
+    wide = smear.copy()  # stretch each smear sideways so the window gaps fill in: horizontal smears, not bars
+    for sh in range(6, int(46 * k) + 1, 6):
+        wide = np.maximum(wide, np.maximum(np.roll(smear, sh, 1), np.roll(smear, -sh, 1)))
+    smear = pt.blur(wide, 2.0 * k)
+    out = pt.mixa(out, pt.rgb(tk.mix(ORANGE, PALE, 0.25)), smear * wet * 0.78)
     # the far city: darker at the water line, rising to a lighter band at the towers' feet
     z = pic.pos[..., 2]
     farwall = pic.solid & pic.far & ~pic.flat
