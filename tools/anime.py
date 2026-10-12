@@ -453,7 +453,11 @@ def smears(pic, out, rng):
     r = pt.blur(r, (5.0 if pic.look.strokes else 2.5) * k, axes=(1,))
     bands = gap + (1 - gap) * pt.step(0.38, 0.56, pt.noise(pic.shape, (7 * k, 300 * k), rng))
     local = pt.luma(pic.col)
-    puddle = local < pt.blur(local, 40 * k) * 0.93  # the darker patches of the ground are standing water
+    # the darker patches of the ground are standing water; only the ground itself is compared, so a thing
+    # standing on it does not ring itself with a puddle
+    ground = (pic.wet > 0).astype(np.float32)
+    around = pt.blur(local * ground, 40 * k) / np.maximum(pt.blur(ground, 40 * k), 0.05)
+    puddle = local < around * 0.93
     wet = bands * np.where(puddle, 1.0, 0.6)
     return pt.screen(out, r * (wet * pic.wet * 2.2)[..., None])
 

@@ -130,7 +130,7 @@ def drum(pic, out, rng):
     p = pic.pos - np.array(DRUM_AT, np.float32)
     along = p @ ax
     r = np.linalg.norm(p - along[..., None] * ax, axis=-1)
-    m = pic.solid & (r < 0.5) & (np.abs(along) < 0.42) & (pic.pos[..., 2] > Z + 0.012)
+    m = pic.solid & (r < 0.5) & (np.abs(along) < 0.42) & ~level(pic)  # never the roof under it
     face = m & (np.abs(pic.n @ ax) > 0.7)
     out = np.where(m[..., None], pt.rgb(tk.mix(DRUM, an.BG, 0.45)), out)
     out = np.where(face[..., None], pt.rgb(tk.mix(DRUM, P["muted"], 0.12)), out)
@@ -151,10 +151,11 @@ def under(pic, out, rng):
         belly = m & ~np.roll(m, -d, 0)                                  # the underside, a step darker
         top = m & ~np.roll(m, d, 0)                                     # the upper edge, a step lighter
         facing = m & ~np.where(side > 0, np.roll(m, -2 * d, 1), np.roll(m, 2 * d, 1))  # the edge toward the lantern
-        out = np.where(m[..., None], pt.blur(out, 9 * k), out)          # what is behind it loses its marks
         colour = pt.mixa(np.broadcast_to(pt.rgb(CLOUD_FAR), out.shape), pt.rgb(CLOUD), reach)
         colour = pt.mixa(colour, pt.rgb(CLOUD_LIT), glow)
         tone = tone * (0.75 + 0.55 * glow)
+        # beyond the light the cloud is thin against the sky but covers a tower it crosses with its own flat tone
+        tone = np.where(pic.solid, np.maximum(tone, 0.9 * (1 - reach)), tone)
         out = pt.mixa(out, colour, pt.blur(m.astype(np.float32), 0.7 * k) * tone)
         out = pt.mixa(out, pt.rgb(CLOUD_DARK), pt.blur(belly.astype(np.float32), 0.7 * k) * tone * 0.5 * reach)
         lit = pt.blur((top | facing).astype(np.float32), 0.7 * k) * glow * reach  # lit edges only in the light
