@@ -33,6 +33,12 @@ WIN_WARM = tk.mix(ORANGE, PALE, 0.3)
 CLOUD = tk.mix(an.SEL, P["muted"], 0.3)
 CLOUD_LIT = tk.mix(ORANGE, P["muted"], 0.3)
 CLOUD_DARK = tk.mix(an.BG, an.SEL, 0.6)
+CLOUD_FAR = tk.mix(an.BG, an.SEL, 0.3)   # cloud the lantern does not reach: a step darker than the sky behind it
+ROOF_DARK = tk.mix(an.BG, an.SEL, 0.12)
+DRUM = tk.mix(an.BG, P["brown"], 0.3)
+DRUM_AT, DRUM_YAW = (-1.6, 17.0, b.DECK_Z + 0.46), np.radians(52)
+TIER_AT = (85.0, 300.0, 9e5)   # the far city in two depth tones only
+TOWER =((-150.0, 235.0), (-124.0, 262.0), 96.0)  # the one taller mass of the left group: two corners and its top
 VENT_BODY = tk.mix(an.STEEL, P["muted"], 0.2)
 STAIN = tk.mix(an.BG, an.SEL, 0.2)
 
@@ -72,6 +78,11 @@ def build(rng):
     for x in (1.9, 2.8, 3.4):
         K.box((x - 0.03, FACE_Y - 0.06, 59.3), (x + 0.03, FACE_Y, 59.4))
     K.done("cable_clips", steel)
+    (x0, y0), (x1, y1), top = TOWER
+    T = city.Boxes()
+    T.box((x0, y0, 0), (x1, y1, top))
+    T.box((x0 + 7, y0 + 7, top), (x1 - 9, y1 - 7, top + 5))
+    T.done("tall_tower", city.plain("tall_tower", rg.BODY_FAR))
 
 
 def level(pic):
@@ -97,10 +108,34 @@ def cloud(pic, rng, rows, cover):
     return (n * (0.55 + 0.45 * band) > 1 - cover) & (band > 0.02)
 
 
+def clouds(pic):
+    """The two bands of low cloud, each with how strongly it is painted."""
+    k, hz = pic.k, pic.horizon
+    rng = np.random.default_rng(pic.look.seed + 500)
+    return [(cloud(pic, rng, rows, cover) & (pic.dist > 150), tone)
+            for rows, cover, tone in (((hz - 250 * k, hz - 40 * k), 0.42, 0.42), ((hz - 120 * k, hz + 60 * k), 0.5, 0.58))]
+
+
 def dress(pic, rng):
-    """Windows on the far towers, drawn as loose clusters of marks."""
-    an.marks(pic, rng, pic.far & an.walls(pic)[0], bay=3.0, floor_h=3.2, ground=2.0, part=0.4, warm=0.16,
+    """Windows on the far towers, drawn as a few loose clusters of marks, and none where cloud lies over a wall."""
+    clear = ~np.any([m for m, _ in clouds(pic)], axis=0)
+    an.marks(pic, rng, pic.far & an.walls(pic)[0] & clear, bay=3.0, floor_h=3.2, ground=2.0, part=0.2, warm=0.16,
              cool=WIN_COOL, lit=WIN_WARM)
+
+
+def drum(pic, out, rng):
+    """The cable drum as two flat tones, with a drawn line inside each rim and round the axle."""
+    k = pic.k
+    ax = np.array((np.cos(DRUM_YAW), np.sin(DRUM_YAW), 0.0), np.float32)
+    p = pic.pos - np.array(DRUM_AT, np.float32)
+    along = p @ ax
+    r = np.linalg.norm(p - along[..., None] * ax, axis=-1)
+    m = pic.solid & (r < 0.5) & (np.abs(along) < 0.42) & (pic.pos[..., 2] > Z + 0.012)
+    face = m & (np.abs(pic.n @ ax) > 0.7)
+    out = np.where(m[..., None], pt.rgb(tk.mix(DRUM, an.BG, 0.45)), out)
+    out = np.where(face[..., None], pt.rgb(tk.mix(DRUM, P["muted"], 0.12)), out)
+    line = face & ((np.abs(r - 0.39) < 0.012) | (np.abs(r - 0.09) < 0.012))
+    return pt.mixa(out, pt.rgb(an.LINE), pt.ink(line, np.ones(pic.shape, np.float32), k, rng, 0.8) * 0.75)
 
 
 def under(pic, out, rng):
@@ -111,21 +146,32 @@ def under(pic, out, rng):
     glow = near_to(pic, AT, 1500)
     side = np.where(np.arange(pic.shape[1])[None, :] < pic.at(AT)[1], 1, -1)  # which way the lantern lies
     d = max(2, int(round(7 * k)))
-    for rows, cover, tone in (((hz - 250 * k, hz - 40 * k), 0.42, 0.42), ((hz - 120 * k, hz + 60 * k), 0.5, 0.58)):
-        m = cloud(pic, rng, rows, cover) & (pic.dist > 150)
+    reach = pt.step(0.1, 0.45, glow)   # 1 inside the body of the lantern's light, 0 beyond it
+    for m, tone in clouds(pic):
         belly = m & ~np.roll(m, -d, 0)                                  # the underside, a step darker
         top = m & ~np.roll(m, d, 0)                                     # the upper edge, a step lighter
         facing = m & ~np.where(side > 0, np.roll(m, -2 * d, 1), np.roll(m, 2 * d, 1))  # the edge toward the lantern
         out = np.where(m[..., None], pt.blur(out, 9 * k), out)          # what is behind it loses its marks
-        colour = pt.mixa(np.broadcast_to(pt.rgb(CLOUD), out.shape), pt.rgb(CLOUD_LIT), glow)
-        tone = tone * (0.55 + 0.75 * glow)                              # fainter away from the lantern
+        colour = pt.mixa(np.broadcast_to(pt.rgb(CLOUD_FAR), out.shape), pt.rgb(CLOUD), reach)
+        colour = pt.mixa(colour, pt.rgb(CLOUD_LIT), glow)
+        tone = tone * (0.75 + 0.55 * glow)
         out = pt.mixa(out, colour, pt.blur(m.astype(np.float32), 0.7 * k) * tone)
-        out = pt.mixa(out, pt.rgb(CLOUD_DARK), pt.blur(belly.astype(np.float32), 0.7 * k) * tone * 0.5)
-        lit = pt.blur((top | facing).astype(np.float32), 0.7 * k) * (0.25 + 0.75 * glow)
+        out = pt.mixa(out, pt.rgb(CLOUD_DARK), pt.blur(belly.astype(np.float32), 0.7 * k) * tone * 0.5 * reach)
+        lit = pt.blur((top | facing).astype(np.float32), 0.7 * k) * glow * reach  # lit edges only in the light
         out = pt.mixa(out, pt.mixa(colour, pt.rgb(PALE), 0.3), lit * tone * 0.9)
+    # the roof away from the lantern is a step darker and cooler, and darkest along the bottom of the picture;
+    # the lantern's own pool is left as it is
+    pool = near_to(pic, (AT[0], AT[1], Z), 1150)
+    low = pt.step(0.72, 1.0, np.arange(pic.shape[0], dtype=np.float32)[:, None] / pic.shape[0])
+    away = np.clip(1 - pt.step(0.0, 0.5, pool) + 0.5 * low, 0, 1)
+    out = pt.mixa(out, pt.rgb(ROOF_DARK), level(pic) * away * 0.68)
+    # and so are the far parapet and the city beyond the lantern's reach, so nothing out there reads as lit
+    beyond = (pic.solid & (pic.pos[..., 1] > 33.0)) * (1 - reach)
+    out = pt.mixa(out, pt.rgb(ROOF_DARK), beyond * 0.45)
+    out = drum(pic, out, rng)
     # the near parapet block stands in shadow, a step darker than the roof, so the lantern owns the picture
     block = pic.solid & (pic.pos[..., 1] < FACE_Y + 3.0)
-    out = pt.mixa(out, pt.rgb(an.BG), block * 0.4)
+    out = pt.mixa(out, pt.rgb(an.BG), block * (0.56 + 0.2 * low))
     # on it: a stain run down from the vent, and one joint in the wall
     face = pic.solid & (np.abs(pic.pos[..., 1] - FACE_Y) < 0.02) & (pic.n[..., 1] < -0.5)
     (x0, z0), (x1, _) = VENT
@@ -156,7 +202,7 @@ LOOK = an.Look(
     glows=(an.Glow(an.within((2.1, 19.2, 59.9), (6.4, 23.6, 64.1)), smear=0.3),
            an.Glow(an.within((9.0, 25.5, 64.0), (12.0, 26.5, 66.0)), halo=((9, 3.0),), colour=RED)),
     discs=((AT, (4.6, 11.0), (0.36, 0.15), ORANGE),),
-    tier_at=(85.0, 280.0, 520.0), veil=(), wet=level, under=under, over=over, tint=0.4,
+    tier_at=TIER_AT, veil=(), wet=level, under=under, over=over, tint=0.4,
     sky=(an.SKY_TOP, tk.mix(an.BG, an.SEL, 0.24), tk.mix(an.BG, an.SEL, 0.6)),
     dress=dress, wobble=1.4, hesitate=True, cut=3.0, ring_bands=0.6, body=(13.0, 0.1), shade_wobble=3.0,
     strokes=0.7)
