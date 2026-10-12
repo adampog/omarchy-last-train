@@ -14,6 +14,7 @@ traced from another work or made by an image-generation model. No third-party te
 | scenes B and C at full size, in progress (no image committed yet) | `tools/bg_b_moored_lantern.py`, `tools/bg_c_riders_stop.py` | 11, 12 | 160 | original code-made art: the lantern sphere in low cloud on its roof, and the parked trail bike of tubes and boxes on an elevated road |
 | roughs of scenes B to G (860x360, not shipped, written to `.cache/roughs/`) | `tools/roughs.py` | 11 to 16 | 64 | original code-made art: a lantern sphere on a roof, a parked trail bike of boxes and tubes, a mast and tank, a box-car train on a viaduct, a tunnel mouth, an alley counter |
 | the rough sheet (not shipped) | `tools/rough_sheet.sh` | | | the images above as labelled tiles |
+| animated-look tests of scene A (not shipped, written to `.cache/anime/`; no treatment chosen yet) | `tools/anime_a.py` with `tools/paint.py`, sheet by `tools/anime_sheet.sh` | 7 | 16 (data renders), 128 (the T1 cel render) | original code-made art: the same street, sign and camera as `a-rain-gate`, rendered as flat data and painted in numpy from seeded noise (flat tones, pen lines, painted sky, drawn halos, smears, rain, grain); no brush, texture or image is loaded |
 
 Each new image gets a row here in the commit that adds it. Final file names are given when the set is chosen.
 

@@ -174,6 +174,7 @@ def facade(name, body, glass, cool_a, cool_b, warm, bay=2.0, floor_h=3.3, lit=0.
          em.inputs["Strength"])
     # concrete with grime, glass where the windows are
     grime = node(nt, "ShaderNodeTexNoise", Scale=0.35, Detail=6.0, Roughness=0.6)
+    grime.name = "grime"  # the painted treatments unplug it for a flat wall colour
     link(nt, geo.outputs["Position"], grime.inputs["Vector"])
     shade = mix_rgb(nt, grime.outputs["Fac"], tk.scale(srgb(body), 0.55), srgb(body))
     bsdf = node(nt, "ShaderNodeBsdfPrincipled")
