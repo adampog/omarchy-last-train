@@ -1,7 +1,7 @@
 [project]
-name = "neo-tokyo"
+name = "last-train"
 version = "0.1.0"
-description = "Scripts that render the Neo-Tokyo Omarchy theme's backgrounds"
+description = "Scripts that render the Last Train Omarchy theme's backgrounds"
 requires-python = "==3.13.*"
 dependencies = ["bpy==5.2.2"]
 

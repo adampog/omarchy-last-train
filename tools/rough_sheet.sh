@@ -20,7 +20,7 @@ tile "$repo/.cache/roughs/rough-d.png" "D  Signal roof (rough, reserve)" 4
 tile "$repo/.cache/roughs/rough-e.png" "E  Last train (rough)" 5
 tile "$repo/.cache/roughs/rough-f.png" "F  Tunnel mouth (rough, reserve)" 6
 tile "$repo/.cache/roughs/rough-g.png" "G  The counter (rough, reserve)" 7
-tile "$repo/backgrounds/06-neo-tokyo-omarchy-skyline.png" "06  carried over, re-tinted to the theme palette" 8
+tile "$repo/backgrounds/06-last-train-omarchy-skyline.png" "06  carried over, re-tinted to the theme palette" 8
 magick montage "$tmp"/[1-8].png -tile 2x4 -geometry +6+6 -background "$paper" "$out/rough-sheet.png"
 rm -r "$tmp"
 echo "wrote $out/rough-sheet.png"

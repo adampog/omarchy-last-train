@@ -27,7 +27,7 @@ from mathutils import Euler, Vector  # noqa: E402
 import scenes as tk  # noqa: E402
 from scenes import srgb, node, link, mix  # noqa: E402
 
-NAME = "06-neo-tokyo-omarchy-skyline"
+NAME = "06-last-train-omarchy-skyline"
 LOGO = "/usr/share/omarchy/logo.svg"
 
 # palette: colors.toml, and mixes of its colours

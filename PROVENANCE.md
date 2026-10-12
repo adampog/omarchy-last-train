@@ -9,7 +9,7 @@ traced from another work or made by an image-generation model. No third-party te
 | Asset | Made by | Seed | Samples | Origin |
 |---|---|---|---|---|
 | `colors.toml`, `neovim.lua`, `btop.theme`, `chromium.theme`, `icons.theme` | written by hand | | | the theme palette and configuration |
-| `backgrounds/06-neo-tokyo-omarchy-skyline.png` | `tools/bg6_wordmark.py` | 1 | 64 | original code-made art: the Omarchy wordmark extruded, over a city of procedural boxes |
+| `backgrounds/06-last-train-omarchy-skyline.png` | `tools/bg6_wordmark.py` | 1 | 64 | original code-made art: the Omarchy wordmark extruded, over a city of procedural boxes |
 | `backgrounds/a-rain-gate.png` | `tools/bg_a_rain_gate.py` | 7 | 160 | original code-made art: a wet street of procedural boxes under a sign stack of plain frames, bars and a ring, with no lettering |
 | scenes B and C at full size, in progress (no image committed yet) | `tools/bg_b_moored_lantern.py`, `tools/bg_c_riders_stop.py` | 11, 12 | 160 | original code-made art: the lantern sphere in low cloud on its roof, and the parked trail bike of tubes and boxes on an elevated road |
 | roughs of scenes B to G (860x360, not shipped, written to `.cache/roughs/`) | `tools/roughs.py` | 11 to 16 | 64 | original code-made art: a lantern sphere on a roof, a parked trail bike of boxes and tubes, a mast and tank, a box-car train on a viaduct, a tunnel mouth, an alley counter |

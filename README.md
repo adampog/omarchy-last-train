@@ -1,4 +1,4 @@
-# Neo-Tokyo
+# Last Train
 
 A cyberpunk megacity theme for [Omarchy](https://omarchy.org): red and orange neon on blue-black.
 
@@ -10,6 +10,20 @@ A cyberpunk megacity theme for [Omarchy](https://omarchy.org): red and orange ne
 | `neovim.lua`, `btop.theme`, `chromium.theme` | The same palette for Neovim, btop and Chromium |
 | `icons.theme` | Yaru-red icons, to match the red accent |
 | `backgrounds/` | Wallpapers at 3440×1440, all original art rendered by the scripts in `tools/` |
+
+## Install
+
+Omarchy takes a theme's name from its folder name, so the folder must be named `last-train`; it then shows
+as "Last Train". Copy or clone this repository to that folder:
+
+```bash
+git clone <this repository> ~/.config/omarchy/themes/last-train
+omarchy theme set "Last Train"
+```
+
+`omarchy theme install <git-url>` also works. It names the folder after the repository, with a leading
+`omarchy-` and a trailing `-theme` removed, so the repository has to be named `last-train`,
+`omarchy-last-train-theme` or the like.
 
 ## Palette
 
