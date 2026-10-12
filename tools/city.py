@@ -192,8 +192,9 @@ def node_normal_z(nt, geo):
     return sep.outputs["Z"]
 
 
-def wet_road(name, colour, puddle=0.5, size=1.0, rough=0.32, lines=None):
-    """Wet asphalt: mirror puddles with broken edges, rougher grain between them."""
+def wet_road(name, colour, puddle=0.5, size=1.0, rough=0.32, lines=None, slick=None):
+    """Wet asphalt: mirror puddles with broken edges, rougher grain between them. `slick(nt, geo)` gives a 0 to 1
+    socket for where a film of water smooths the grain, so lights smear down it."""
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
     nt = mat.node_tree
@@ -207,6 +208,7 @@ def wet_road(name, colour, puddle=0.5, size=1.0, rough=0.32, lines=None):
     ramp.inputs["From Max"].default_value = puddle + 0.04
     link(nt, big.outputs["Fac"], ramp.inputs["Value"])  # 0 in a puddle, 1 on the grain
     dry = ramp.outputs["Result"]
+    keep = 1.0 if slick is None else math_node(nt, "SUBTRACT", 1.0, slick(nt, geo))
     grain = node(nt, "ShaderNodeTexNoise", Scale=60.0, Detail=3.0, Roughness=0.7)
     link(nt, geo.outputs["Position"], grain.inputs["Vector"])
     ripple = node(nt, "ShaderNodeTexNoise", Scale=9.0, Detail=2.0, Roughness=0.5)
@@ -216,8 +218,15 @@ def wet_road(name, colour, puddle=0.5, size=1.0, rough=0.32, lines=None):
     if lines is not None:
         base = lines(nt, geo, base)
     link(nt, base, bsdf.inputs["Base Color"])
-    link(nt, math_node(nt, "MULTIPLY_ADD", dry, rough - 0.04, 0.04), bsdf.inputs["Roughness"])
-    height = math_node(nt, "ADD", math_node(nt, "MULTIPLY", math_node(nt, "MULTIPLY", grain.outputs["Fac"], dry), 0.004),
+    if slick is None:
+        link(nt, math_node(nt, "MULTIPLY_ADD", dry, rough - 0.04, 0.04), bsdf.inputs["Roughness"])
+        grit = math_node(nt, "MULTIPLY", math_node(nt, "MULTIPLY", grain.outputs["Fac"], dry), 0.004)
+    else:
+        link(nt, math_node(nt, "MULTIPLY_ADD", math_node(nt, "MULTIPLY", dry, keep), rough - 0.04, 0.04),
+             bsdf.inputs["Roughness"])
+        grit = math_node(nt, "MULTIPLY", math_node(nt, "MULTIPLY", math_node(nt, "MULTIPLY", grain.outputs["Fac"], dry),
+                                                   keep), 0.004)
+    height = math_node(nt, "ADD", grit,
                        math_node(nt, "MULTIPLY", math_node(nt, "SUBTRACT", 1.0, dry),
                                  math_node(nt, "MULTIPLY", ripple.outputs["Fac"], 0.0015)))
     bump = node(nt, "ShaderNodeBump", Strength=1.0, Distance=1.0)
@@ -310,9 +319,44 @@ def haze_layer(name, centre, dims, top, density, colour, glow, glow_strength, an
     return _volume_box(name, mat, centre, dims)
 
 
-def steam(name, base, height, radius, density, colour, anisotropy=0.6, glow=None, glow_strength=0.0):
+def low_cloud(name, centre, dims, base, top, density, colour, anisotropy=0.5, size=9.0, frame=0.0):
+    """Low cloud lying on a roof: thickest at `base` metres, a soft ceiling at `top`, in billows `size` metres
+    across. It has no light of its own; whatever lamp stands in it gives it its colour."""
+    mat = bpy.data.materials.new(name)
+    mat.use_nodes = True
+    nt = mat.node_tree
+    nt.nodes.clear()
+    out = node(nt, "ShaderNodeOutputMaterial")
+    geo = node(nt, "ShaderNodeNewGeometry")
+    sep = node(nt, "ShaderNodeSeparateXYZ")
+    link(nt, geo.outputs["Position"], sep.inputs[0])
+    fall = node(nt, "ShaderNodeMapRange")
+    fall.interpolation_type = "SMOOTHSTEP"
+    fall.inputs["From Min"].default_value, fall.inputs["From Max"].default_value = base, top
+    fall.inputs["To Min"].default_value, fall.inputs["To Max"].default_value = 1.0, 0.0
+    link(nt, sep.outputs["Z"], fall.inputs["Value"])
+    billow = node(nt, "ShaderNodeTexNoise", Scale=1.0 / size, Detail=2.0, Roughness=0.55)
+    billow.noise_dimensions = "4D"
+    billow.inputs["W"].default_value = frame
+    link(nt, vec_node(nt, "MULTIPLY", geo.outputs["Position"], (1.0, 1.0, 2.2)).outputs[0], billow.inputs["Vector"])
+    part = node(nt, "ShaderNodeMapRange")
+    part.interpolation_type = "SMOOTHSTEP"
+    part.inputs["From Min"].default_value, part.inputs["From Max"].default_value = 0.42, 0.62
+    part.inputs["To Min"].default_value, part.inputs["To Max"].default_value = 0.03, 1.0
+    link(nt, billow.outputs["Fac"], part.inputs["Value"])
+    vol = node(nt, "ShaderNodeVolumePrincipled", Anisotropy=anisotropy)
+    vol.inputs["Color"].default_value = srgb(colour)
+    link(nt, math_node(nt, "MULTIPLY", math_node(nt, "POWER", fall.outputs["Result"], 1.6),
+                       math_node(nt, "MULTIPLY", part.outputs["Result"], density)), vol.inputs["Density"])
+    link(nt, vol.outputs[0], out.inputs["Volume"])
+    return _volume_box(name, mat, centre, dims)
+
+
+def steam(name, base, height, radius, density, colour, anisotropy=0.6, glow=None, glow_strength=0.0, broken=0.0,
+          frame=0.0):
     """A column of steam from `base`: wider and thinner as it rises, broken by noise. `glow` is the light it has
-    caught, for steam that stands far from any lamp."""
+    caught, for steam that stands far from any lamp. `broken` above 0 tears it into billows with two octaves of
+    noise and thins the top; `frame` is the fixed moment of that noise."""
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
     nt = mat.node_tree
@@ -325,8 +369,19 @@ def steam(name, base, height, radius, density, colour, anisotropy=0.6, glow=None
     up = math_node(nt, "DIVIDE", sep.outputs["Z"], height)  # 0 at the grate, 1 at the top
     drift = math_node(nt, "MULTIPLY", math_node(nt, "POWER", up, 1.5), radius * 1.2)  # leans as it rises
     dx = math_node(nt, "SUBTRACT", sep.outputs["X"], drift)
-    r = math_node(nt, "SQRT", math_node(nt, "ADD", math_node(nt, "POWER", dx, 2.0),
-                                        math_node(nt, "POWER", sep.outputs["Y"], 2.0)))
+    dy = sep.outputs["Y"]
+    if broken:
+        # the column wanders: a slow noise pushes it sideways, more as it rises
+        wander = node(nt, "ShaderNodeTexNoise", Scale=0.3, Detail=1.0, Roughness=0.5)
+        wander.noise_dimensions = "4D"
+        wander.inputs["W"].default_value = frame
+        link(nt, geo.outputs["Position"], wander.inputs["Vector"])
+        w = node(nt, "ShaderNodeSeparateColor")
+        link(nt, wander.outputs["Color"], w.inputs[0])
+        push = math_node(nt, "MULTIPLY", math_node(nt, "MULTIPLY_ADD", up, 1.0, 0.25), broken * radius * 1.6)
+        dx = math_node(nt, "SUBTRACT", dx, math_node(nt, "MULTIPLY", math_node(nt, "SUBTRACT", w.outputs[0], 0.5), push))
+        dy = math_node(nt, "SUBTRACT", dy, math_node(nt, "MULTIPLY", math_node(nt, "SUBTRACT", w.outputs[1], 0.5), push))
+    r = math_node(nt, "SQRT", math_node(nt, "ADD", math_node(nt, "POWER", dx, 2.0), math_node(nt, "POWER", dy, 2.0)))
     width = math_node(nt, "MULTIPLY_ADD", up, radius * 0.8, radius * 0.2)
     core = math_node(nt, "SUBTRACT", 1.0, math_node(nt, "DIVIDE", r, width))
     core = math_node(nt, "MAXIMUM", core, 0.0)
@@ -336,8 +391,29 @@ def steam(name, base, height, radius, density, colour, anisotropy=0.6, glow=None
     puff = node(nt, "ShaderNodeMapRange")
     puff.inputs["From Min"].default_value, puff.inputs["From Max"].default_value = 0.36, 0.62
     link(nt, noise.outputs["Fac"], puff.inputs["Value"])
-    d = math_node(nt, "MULTIPLY", math_node(nt, "MULTIPLY", core, fade),
-                  math_node(nt, "MULTIPLY", puff.outputs["Result"], density))
+    if broken:
+        # two octaves, the billows and the wisps on them, eat into the column from its edge
+        octs = []
+        for scale, squeeze in ((0.55, 0.6), (1.9, 0.5)):
+            n = node(nt, "ShaderNodeTexNoise", Scale=scale, Detail=0.0, Roughness=0.5)
+            n.noise_dimensions = "4D"
+            n.inputs["W"].default_value = frame
+            link(nt, vec_node(nt, "MULTIPLY", geo.outputs["Position"], (1.0, 1.0, squeeze)).outputs[0],
+                 n.inputs["Vector"])
+            octs.append(n.outputs["Fac"])
+        both = math_node(nt, "ADD", math_node(nt, "MULTIPLY", octs[0], 0.62), math_node(nt, "MULTIPLY", octs[1], 0.38))
+        gap = node(nt, "ShaderNodeMapRange")
+        gap.interpolation_type = "SMOOTHSTEP"
+        gap.inputs["From Min"].default_value, gap.inputs["From Max"].default_value = 0.4, 0.62
+        link(nt, both, gap.inputs["Value"])
+        eaten = math_node(nt, "SUBTRACT", core, math_node(nt, "MULTIPLY", math_node(nt, "SUBTRACT", 1.0,
+                                                                                    gap.outputs["Result"]), broken))
+        core = math_node(nt, "MAXIMUM", eaten, 0.0)
+        fade = math_node(nt, "POWER", fade, 1.8)
+        d = math_node(nt, "MULTIPLY", math_node(nt, "MULTIPLY", core, fade), density)
+    else:
+        d = math_node(nt, "MULTIPLY", math_node(nt, "MULTIPLY", core, fade),
+                      math_node(nt, "MULTIPLY", puff.outputs["Result"], density))
     vol = node(nt, "ShaderNodeVolumePrincipled", Anisotropy=anisotropy)
     vol.inputs["Color"].default_value = srgb(colour)
     link(nt, d, vol.inputs["Density"])

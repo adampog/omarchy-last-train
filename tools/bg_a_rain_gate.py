@@ -46,6 +46,7 @@ PITCH = math.atan(230 / 2293)  # puts the horizon 230 px below the middle of the
 SIGN_Y = 24.0  # the sign stack hangs over the left pavement, this far from the camera
 SIGN_X = (-5.5, -2.9)
 SIGN_MID = (-4.2, SIGN_Y, 5.35)
+SLICK, SLICK_HALF = 0.6, 3.4  # how much smoother the band under the sign is, and its half width in metres
 
 
 def buildings(rng):
@@ -87,13 +88,34 @@ def buildings(rng):
             D.box((11.55, y, z), (12.0, y + 0.9, z + 0.6))
     D.done("trim", dark)
 
-    # two shopfronts on the right with a faint orange window, and the sodium light at the end of the street
-    faint = tk.emissive("faint", srgb(tk.mix(SODIUM, P["background"], 0.25)), 0.16)
-    F = city.Boxes()
-    F.box((11.93, 21.6, 1.0), (11.97, 23.2, 2.6))
-    F.box((11.93, 38.2, 0.9), (11.97, 40.4, 2.6))
-    F.box((11.93, 27.5, 3.9), (11.97, 29.0, 5.2))
-    F.done("faint_windows", faint)
+    # shopfronts on the right: lit rooms behind a frame, a blind in the top of each and a shelf of things below,
+    # warm but dimmer than the sodium door at the end of the street
+    room = tk.emissive("room", srgb(SODIUM), 0.5)
+    room_low = tk.emissive("room_low", srgb(tk.mix(SODIUM, P["brown"], 0.5)), 0.22)
+    F, Fl, Fr = city.Boxes(), city.Boxes(), city.Boxes()
+    rs = random.Random(SEED + 2)
+    for y0, y1, z0, z1 in ((21.6, 23.2, 1.0, 2.6), (38.2, 40.4, 0.9, 2.6), (27.5, 29.0, 3.9, 5.2)):
+        mid = z0 + (z1 - z0) * 0.45
+        F.box((11.93, y0, mid), (11.97, y1, z1))    # the lit upper room
+        Fl.box((11.93, y0, z0), (11.97, y1, mid))   # dimmer below the shelf
+        for a, b, c, d in ((y0 - 0.09, y1 + 0.09, z1, z1 + 0.09), (y0 - 0.09, y1 + 0.09, z0 - 0.09, z0),
+                           (y0 - 0.09, y0, z0, z1), (y1, y1 + 0.09, z0, z1)):
+            Fr.box((11.86, a, c), (11.97, b, d))    # the frame, proud of the wall
+        ym = (y0 + y1) / 2
+        Fr.box((11.9, ym - 0.025, z0), (11.93, ym + 0.025, z1))  # a mullion
+        slats = int((z1 - mid) * 0.62 / 0.085)
+        for k in range(slats):                      # the blind, let down part of the way
+            z = z1 - 0.05 - k * 0.085
+            Fr.box((11.9, y0, z - 0.052), (11.925, y1, z))
+        Fr.box((11.88, y0, mid - 0.03), (11.93, y1, mid + 0.02))  # the shelf
+        y = y0 + 0.1
+        while y < y1 - 0.25:                        # and what stands on it
+            w, h = rs.uniform(0.1, 0.24), rs.uniform(0.12, 0.34)
+            Fr.box((11.9, y, mid), (11.925, y + w, mid + h))
+            y += w + rs.uniform(0.05, 0.3)
+    F.done("rooms", room)
+    Fl.done("rooms_low", room_low)
+    Fr.done("room_frames", city.plain("room_frames", P["background"], roughness=0.5))
     shop = tk.emissive("sodium", srgb(SODIUM), 14.0)
     S = city.Boxes()
     S.box((1.6, 87.9, 0.7), (3.2, 87.98, 3.0))
@@ -101,9 +123,25 @@ def buildings(rng):
     tk.light("POINT", (2.4, 85.5, 2.4), 1800, srgb(SODIUM), size=1.0)
 
 
+def slick(nt, geo):
+    """A film of water in a band from the foot of the sign toward the camera, where the red halo lies on the street."""
+    sep = city.node(nt, "ShaderNodeSeparateXYZ")
+    city.link(nt, geo.outputs["Position"], sep.inputs[0])
+    k = (SIGN_MID[0] - CAM[0]) / SIGN_Y  # the line on the ground from under the camera to under the sign
+    off = city.math_node(nt, "ABSOLUTE", city.math_node(nt, "SUBTRACT", sep.outputs["X"],
+                                                        city.math_node(nt, "MULTIPLY_ADD", sep.outputs["Y"], k, CAM[0])))
+    band = city.node(nt, "ShaderNodeMapRange")
+    band.interpolation_type = "SMOOTHSTEP"
+    band.inputs["From Min"].default_value, band.inputs["From Max"].default_value = SLICK_HALF * 0.35, SLICK_HALF
+    band.inputs["To Min"].default_value, band.inputs["To Max"].default_value = SLICK, 0.0
+    city.link(nt, off, band.inputs["Value"])
+    return city.math_node(nt, "MULTIPLY", band.outputs["Result"],
+                          city.math_node(nt, "LESS_THAN", sep.outputs["Y"], SIGN_Y + 1.0))
+
+
 def street():
     road = city.wet_road("road", ROAD, puddle=0.52, size=1.0, rough=0.2)
-    pave = city.wet_road("pave", PAVE, puddle=0.6, size=0.6, rough=0.22)
+    pave = city.wet_road("pave", PAVE, puddle=0.6, size=0.6, rough=0.22, slick=slick)
     G = city.Boxes()
     G.box((-400, -60, -1.0), (400, 1200, 0.0))
     G.done("ground", road)
@@ -184,6 +222,7 @@ def rain(rng):
     """Fine streaks, only where the sign lights them."""
     cx, cy, cz = SIGN_MID
     bins = [[], [], []]
+    thin = random.Random(SEED + 3)  # its own stream, so the city after it stands where it stood
     for _ in range(900):
         r = 1.5 + rng.random() ** 0.7 * 8.0
         a, e = rng.uniform(0, 2 * math.pi), rng.uniform(-0.9, 0.9)
@@ -191,6 +230,8 @@ def rain(rng):
         if z < 0.4 or z > 8.6 or x < -5.5:
             continue
         ln = rng.uniform(0.25, 0.6)
+        if r > 5.5 and thin.random() < 0.45:  # fewer in the outer half, away from the tubes
+            continue
         bins[min(2, int((r - 1.5) / 2.7))].append([(x, y, z), (x + 0.04, y, z - ln)])
     for k, (pts, s) in enumerate(zip(bins, (2.4, 1.1, 0.45))):
         if pts:
@@ -204,14 +245,15 @@ def air():
               glow_strength=0.06, power=2.2)
     # a thinner pool of it down the street round the sodium light
     city.mist("shop_mist", (2.3, 84.0, 2.6), 16.0, 0.03, MIST, anisotropy=0.5, glow=SODIUM, glow_strength=0.02)
-    city.steam("steam", (3.4, 28.0, 0.02), 7.5, 2.4, 2.6, MIST, glow=tk.mix(MIST, RED_BLOOM, 0.45), glow_strength=0.1)
+    city.steam("steam", (3.4, 28.0, 0.02), 7.5, 2.4, 4.6, MIST, glow=tk.mix(MIST, RED_BLOOM, 0.45), glow_strength=0.12,
+               broken=0.75, frame=float(SEED))
     # the far city stands in blue haze
     city.haze_layer("far_haze", (0, 760, 90), (1700, 1000, 220), 150.0, 0.003, MIST, HAZE_GLOW, 0.014, base=0.0)
 
 
 def far_city(rng):
-    far = city.facade("far", BODY_FAR, GLASS, WIN_A, WIN_B, WIN_WARM, bay=3.5, floor_h=4.0, lit=0.07, strength=0.9,
-                      warm_part=0.15, ground=8.0)
+    far = city.facade("far", BODY_FAR, GLASS, WIN_A, WIN_B, WIN_WARM, bay=1.75, floor_h=2.0, lit=0.065, strength=0.8,
+                      warm_part=0.12, ground=8.0)
     city.skyline(rng, far, None, 230, 230, 900, 34, (22, 52), tall=0.0)
     T = city.Boxes()
     # the towers seen down the street, over the block that closes it

@@ -52,8 +52,8 @@ def look(eye, lens, horizon, yaw=0.0):
 
 
 def far(rng, count=320, near=120, far_=900, spread=60, heights=(18, 55), glow=HAZE_BLUE, glow_strength=0.012,
-        top=150.0, lit=0.08, start=None, turn=0.0, tall=0.03):
-    mat = city.facade("far", BODY_FAR, GLASS, WIN_A, WIN_B, WIN_WARM, bay=3.5, floor_h=4.0, lit=lit, strength=0.9,
+        top=150.0, lit=0.08, start=None, turn=0.0, tall=0.03, bay=3.5, floor_h=4.0):
+    mat = city.facade("far", BODY_FAR, GLASS, WIN_A, WIN_B, WIN_WARM, bay=bay, floor_h=floor_h, lit=lit, strength=0.9,
                       warm_part=0.2, ground=6.0)
     city.skyline(rng, mat, None, count, near, far_, spread, heights, tall=tall, turn=turn)
     y0 = near if start is None else start

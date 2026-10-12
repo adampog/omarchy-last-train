@@ -11,6 +11,7 @@ traced from another work or made by an image-generation model. No third-party te
 | `colors.toml`, `neovim.lua`, `btop.theme`, `chromium.theme`, `icons.theme` | written by hand | | | the theme palette and configuration |
 | `backgrounds/06-neo-tokyo-omarchy-skyline.png` | `tools/bg6_wordmark.py` | 1 | 64 | original code-made art: the Omarchy wordmark extruded, over a city of procedural boxes |
 | `backgrounds/a-rain-gate.png` | `tools/bg_a_rain_gate.py` | 7 | 160 | original code-made art: a wet street of procedural boxes under a sign stack of plain frames, bars and a ring, with no lettering |
+| scenes B and C at full size, in progress (no image committed yet) | `tools/bg_b_moored_lantern.py`, `tools/bg_c_riders_stop.py` | 11, 12 | 160 | original code-made art: the lantern sphere in low cloud on its roof, and the parked trail bike of tubes and boxes on an elevated road |
 | roughs of scenes B to G (860x360, not shipped, written to `.cache/roughs/`) | `tools/roughs.py` | 11 to 16 | 64 | original code-made art: a lantern sphere on a roof, a parked trail bike of boxes and tubes, a mast and tank, a box-car train on a viaduct, a tunnel mouth, an alley counter |
 | the rough sheet (not shipped) | `tools/rough_sheet.sh` | | | the images above as labelled tiles |
 
@@ -37,15 +38,16 @@ as Omarchy's stock themes use it, and no copy of the SVG is kept in this reposit
 | ImageMagick | resizing, previews and checks | ImageMagick License |
 
 The scripts are this repository's own code under its MIT licence, including the shared helpers in
-`tools/scenes.py` and the city kit in `tools/city.py` (building faces, wet road, tubes, mist, haze, steam), which
+`tools/scenes.py` and the city kit in `tools/city.py` (building faces, wet road, tubes, mist, haze, low cloud, steam), which
 load no images. `pyproject.toml` and `uv.lock` pin the Python packages; `bpy` brings
 numpy, requests, cattrs, cython and zstandard with it, each under its own open licence. Blender's licence covers
 the program, not the images made with it.
 
 ## Fonts
 
-No image in `backgrounds/` contains lettering or uses a font. Any font added later must be openly licensed and
-is listed here with its licence.
+The only lettering in any background is the Omarchy wordmark in background 06, drawn from
+`/usr/share/omarchy/logo.svg`, which is Omarchy's own mark. No background uses a font. Any font added later must
+be openly licensed and is listed here with its licence.
 
 | Font | Used for | Path | Licence |
 |---|---|---|---|
