@@ -30,11 +30,13 @@ as Omarchy's stock themes use it, and no copy of the SVG is kept in this reposit
 |---|---|---|
 | Blender, as the `bpy` 5.2.2 Python module, with Cycles | modelling and rendering the scenes | GPL-3.0-or-later |
 | Python 3.13 | running the scripts | PSF-2.0 |
+| uv | installing the pinned packages | MIT or Apache-2.0 |
 | ImageMagick | resizing, previews and checks | ImageMagick License |
 
-The scripts are this repository's own code under its MIT licence. They also use a small shared helper module of
-the author's own (`_toolkit/scenes.py`, beside this repository), which loads no images. Blender's licence covers the program, not the
-images made with it.
+The scripts are this repository's own code under its MIT licence, including the shared helpers in
+`tools/scenes.py`, which load no images. `pyproject.toml` and `uv.lock` pin the Python packages; `bpy` brings
+numpy, requests, cattrs, cython and zstandard with it, each under its own open licence. Blender's licence covers
+the program, not the images made with it.
 
 ## Fonts
 

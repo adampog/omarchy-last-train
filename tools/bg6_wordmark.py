@@ -1,48 +1,37 @@
 """Background 6, the floating word: the Omarchy wordmark as solid letters floating high over a night megacity,
 lit only by the city below.
 
-    ../dont-panic/.venv/bin/python tools/bg6_wordmark.py [--out DIR] [--percent P] [--samples S]
+    uv run tools/bg6_wordmark.py [--out DIR] [--percent P] [--samples S]
 
 The wordmark is read from /usr/share/omarchy/logo.svg at render time and is not altered: one 2D curve of its
 loops, extruded, so its counters stay open. It is the only file the scene reads besides this theme's colors.toml.
 The city is boxes with windows in rows. The light on the word is the city's: a blue-white uplight from the
 rooftops and a red rim from the lamps, both standing in for the city's glow. Fixed seed. Every colour is the
-theme palette's, or a mix of two of its colours. Every render holds ~/Projects/omarchy-themes/.gpu.lock.
+theme palette's, or a mix of two of its colours.
 """
 
 import argparse
-import fcntl
 import math
 import os
 import random
 import re
 import sys
-import tomllib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
-sys.path.insert(0, os.path.join(REPO, "..", "_toolkit"))
+sys.path.insert(0, HERE)
 
 import bpy  # noqa: E402
 from mathutils import Euler, Vector  # noqa: E402
 
-import scenes as tk  # noqa: E402  (_toolkit/scenes.py)
-from scenes import srgb, node, link  # noqa: E402
+import scenes as tk  # noqa: E402
+from scenes import srgb, node, link, mix  # noqa: E402
 
 NAME = "06-neo-tokyo-omarchy-skyline"
 LOGO = "/usr/share/omarchy/logo.svg"
-GPU_LOCK = os.path.expanduser("~/Projects/omarchy-themes/.gpu.lock")
 
 # palette: colors.toml, and mixes of its colours
-with open(os.path.join(REPO, "colors.toml"), "rb") as _fh:
-    P = tomllib.load(_fh)
-
-
-def mix(a, b, t):
-    """The colour t of the way from a to b, as hex."""
-    ca, cb = (tuple(int(c[i:i + 2], 16) for i in (1, 3, 5)) for c in (a, b))
-    return "#" + "".join(f"{round(x + (y - x) * t):02x}" for x, y in zip(ca, cb))
-
+P = tk.palette()
 
 SKY = P["background"]                                    # the top strip
 LETTER = mix(P["muted"], P["dark_foreground"], 0.5)      # the word's paint, a pale grey that takes the city's colours
@@ -390,11 +379,7 @@ def main():
     sc = build()
     sc.render.resolution_percentage = a.percent
     sc.cycles.samples = a.samples
-    sc.render.filepath = os.path.join(a.out, f"{NAME}.png")
-    with open(GPU_LOCK, "a") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
-        bpy.ops.render.render(write_still=True)
-    print("wrote", sc.render.filepath, flush=True)
+    tk.render(sc, os.path.join(a.out, f"{NAME}.png"))
 
 
 if __name__ == "__main__":

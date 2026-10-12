@@ -32,6 +32,20 @@ Every image is original and made by code in this repository. No photographs, dow
 no image-generation models are used. [PROVENANCE.md](PROVENANCE.md) lists each asset, the script that makes it,
 and the tools and their licences.
 
+## Rebuilding the art
+
+The scripts need [uv](https://docs.astral.sh/uv/), an NVIDIA GPU with OptiX, and an installed Omarchy (the
+wordmark background reads `/usr/share/omarchy/logo.svg`). `pyproject.toml` and `uv.lock` pin Blender's `bpy`
+module at 5.2.2 on Python 3.13.
+
+```bash
+uv sync
+uv run tools/bg6_wordmark.py
+```
+
+Each script writes its image into `backgrounds/`. Seeds are fixed, so a re-render matches the committed image
+apart from a few pixels of GPU sampling noise.
+
 ## Licence
 
 MIT, see [LICENSE](LICENSE). The Omarchy wordmark is Omarchy's own mark and is not covered by this licence.
