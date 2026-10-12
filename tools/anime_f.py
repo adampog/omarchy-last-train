@@ -198,6 +198,19 @@ def under(pic, out, rng):
     pool = wet & (np.abs(cols - cx + pw) < (r0 - l0) * 0.75) & (rows < r0r + 300 * k + pw)
     out = pt.mixa(out, pt.rgb(POOL), pt.blur(pool.astype(np.float32), 5 * k) * 0.45)
     out = pt.mixa(out, pt.rgb(tk.mix(ORANGE, PALE, 0.2)), (smear * wet * 0.5).astype(np.float32))
+    # a finer second run of dim smears across the dark gaps, so no big four-cornered dark shape is left in the pool
+    strip2 = np.floor(np.maximum(rows - r0r, 0) / (9 * k)).astype(int) % 64
+    seg2 = np.searchsorted(np.cumsum(rng.uniform(40, 130, 600)) * k, cols[0])[None, :]
+    keep2 = rng.random((64, 600))[strip2, seg2 % 600] > 0.5
+    s2 = (keep2 * (rows > r0r) * reach).astype(np.float32)
+    wide2 = s2.copy()
+    for sh in range(6, int(50 * k) + 1, 6):
+        wide2 = np.maximum(wide2, np.maximum(np.roll(s2, sh, 1), np.roll(s2, -sh, 1)))
+    out = pt.mixa(out, pt.rgb(tk.mix(ORANGE, PALE, 0.2)), (pt.blur(wide2, 2.0 * k) * wet * 0.2).astype(np.float32))
+    # the road's bounce on the wall's foot: one low flat warm wash either side of the mouth, straight-segment edge
+    wtop = np.interp(x, (-27, -22, -15.4, -5.4, 1, 6), (0.0, 1.8, 3.2, 3.2, 2.4, 0.0))
+    foot = front & (z > 0.05) & (z < wtop) & (x < 7) & (x > -27) & ~((x > -15.4) & (x < -5.4))
+    out = pt.mixa(out, pt.rgb(tk.mix(PATCH, ORANGE, 0.2)), pt.blur(foot.astype(np.float32), 1.0 * k) * 0.16)
     out = pt.mixa(out, pt.rgb(an.BG), (front * 0.0).astype(np.float32))
     # two depth tones in the towers: the nearer ones a step darker
     tower = pic.solid & (z > 14.1) & ~pic.flat
