@@ -246,10 +246,31 @@ def red_lamps(pic):
     return (pic.emit[..., 0] > 0.8) & (pic.emit[..., 1] < 0.45)
 
 
+def w_build(rng):
+    """The scene as committed, with the towers left plain: their windows are drawn by the painter."""
+    import city
+    material = w6.city_material
+    w6.city_material = lambda: city.plain("city", w6.CITY_BODY)
+    try:
+        w6.build()
+    finally:
+        w6.city_material = material
+
+
+def w_dress(pic, rng):
+    """Windows on the towers as loose clusters of small marks, larger and warmer on the nearest blocks."""
+    upright = an.walls(pic)[0] & pic.far
+    near = upright & (pic.dist < 1500)
+    an.marks(pic, rng, near, bay=6.0, floor_h=4.2, ground=4.0, part=0.6, warm=0.3, cool=w6.CITY_WIN, lit=w6.CITY_WARM)
+    an.marks(pic, rng, upright & ~near, bay=10.0, floor_h=5.5, ground=4.0, part=0.75, warm=0.28, cool=w6.CITY_WIN,
+             lit=w6.CITY_WARM)
+
+
 LOOK_06 = Look(
-    name="06", seed=1, build=lambda rng: w6.build(), key_at=(0.0, 380.0, 250.0), key_colour=w6.UPLIGHT,
+    name="06", seed=1, build=w_build, key_at=(0.0, 380.0, 250.0), key_colour=w6.UPLIGHT,
     amounts=(0.0, 0.0, 0.0), glows=(Glow(red_lamps, halo=((7, 2.5),), colour=RED),),
-    tier_at=(560.0, 2600.0, 5200.0), veil=(), under=w_under, far_dim=0.15,
+    tier_at=(560.0, 2600.0, 5200.0), veil=(), under=w_under, far_dim=0.15, dress=w_dress,
+    air=((60.0, 0.1), (30.0, 0.2), (12.0, 0.3)),
     sky=(an.SKY_TOP, tk.mix(an.BG, an.SEL, 0.42), tk.mix(an.SEL, an.BLUE, 0.2)), window_lines=0.0, offset=20000.0)
 
 
