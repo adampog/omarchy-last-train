@@ -59,16 +59,10 @@ def bike(at, heading):
         return [T(u0 + rad * math.cos(2 * math.pi * k / n), 0, WHEEL_R + rad * math.sin(2 * math.pi * k / n))
                 for k in range(n)]
 
-    # wheels: a tyre, a rim, a hub and spokes, so the haze shows through them
-    spokes = []
+    # wheels: a tyre and a plain rim ring, open inside, no spokes
     for u in (AXLE, -AXLE):
         city.tube("tyre", [circle(u, WHEEL_R - 0.055)], 0.055, tyre, cyclic=True)
-        city.tube("rim", [circle(u, WHEEL_R - 0.115)], 0.014, steel, cyclic=True)
-        across(0.045, 0.14, u, 0, WHEEL_R, steel, segments=16)
-        for k in range(18):
-            b, side = 2 * math.pi * (k + 0.5 * (k % 2)) / 18, 0.05 if k % 2 else -0.05
-            spokes.append([T(u, side, WHEEL_R), T(u + 0.225 * math.cos(b), 0, WHEEL_R + 0.225 * math.sin(b))])
-    city.tube("spokes", spokes, 0.0045, steel)
+        city.tube("rim", [circle(u, WHEEL_R - 0.12)], 0.03, body, cyclic=True)
     across(0.125, 0.008, AXLE, -0.07, WHEEL_R, steel)    # front brake disc
     across(0.1, 0.008, -AXLE, 0.07, WHEEL_R, steel)      # rear sprocket
 
@@ -84,13 +78,11 @@ def bike(at, heading):
     city.tube("frame", frame, 0.018, body)
     part((0.2, 0.4, 0.19), 0.17, 0, 0.94, bevel=0.05)             # the slim tank
     part((0.22, 0.6, 0.07), -0.33, 0, 0.92, dull, bevel=0.025)    # the flat seat
-    part((0.17, 0.2, 0.05), -0.72, 0, 0.89, bevel=0.02)           # the short tail
+    part((0.17, 0.2, 0.05), -0.72, 0, 0.9, bevel=0.0)            # the short tail, a straight line with the rack
     part((0.13, 0.3, 0.025), -0.7, 0, 0.74, dull, pitch=14, bevel=0.0)  # the rear guard under it
-    # rack and pannier
-    rack = [[T(-0.55, w, 0.96), T(-0.95, w, 0.96)] for w in (-0.2, -0.07, 0.07, 0.2)]
-    rack += [[T(-0.55, -0.2, 0.96), T(-0.55, 0.2, 0.96)], [T(-0.95, -0.2, 0.96), T(-0.95, 0.2, 0.96)]]
-    rack += [[T(-0.9, w, 0.96), T(-0.66, w * 0.6, 0.6)] for w in (-0.2, 0.2)]
-    city.tube("rack", rack, 0.011, body)
+    # rack and pannier: a flat plate level with the seat line, two straight struts down to the subframe
+    part((0.4, 0.4, 0.03), -0.75, 0, 0.935, body, bevel=0.0)
+    city.tube("rack", [[T(-0.92, w, 0.92), T(-0.7, w * 0.6, 0.6)] for w in (-0.16, 0.16)], 0.012, body)
     part((0.14, 0.38, 0.29), -0.66, 0.24, 0.7, dull, bevel=0.03)
     # the fork: two long legs, thicker below, with clamps and a high guard over the wheel
     low, top, mid = [], [], 0.45
@@ -152,6 +144,7 @@ def build():
                   steel)
         city.tube("posts", [[(x, y, z), (x, y, z + 0.95)] for y in range(-8, 200, 4)], 0.045, steel)
     tk.box("near_post", (0.16, 0.16, 0.5), (-1.95, 2.65, z + 0.25), steel)  # the post at bottom left
+    tk.box("near_post_cap", (0.22, 0.22, 0.05), (-1.95, 2.65, z + 0.525), steel)  # its cap, a step wider
     bike((-2.4, 5.6, z), 26.0)
     # the city fills the right third, orange in its haze; one red window panel in it
     rg.far(rng, count=200, near=260, spread=13, heights=(40, 110), glow=rg.HAZE_ORANGE, glow_strength=0.009,

@@ -16,6 +16,7 @@ traced from another work or made by an image-generation model. No third-party te
 | the rough sheet (not shipped) | `tools/rough_sheet.sh` | | | the images above as labelled tiles |
 | animated-look tests of scene A, three treatments (not shipped; the scripts as tested are at commit 0585ba5) | `tools/anime_a.py` with `tools/paint.py` | 7 | 16 (data renders), 128 (the dropped cel render) | original code-made art: the same street, sign and camera as `a-rain-gate`; the second treatment was chosen and is the technique below |
 | animated roughs of scenes A to G and of background 06 (not shipped, written to `.cache/anime/`) | `tools/anime.py` (the painter) with `tools/paint.py`; `tools/anime_a.py` for A, `tools/anime_roughs.py` for B to G and 06 | A 7, B to G 11 to 16, 06 1 | 16 (data renders) | original code-made art: the committed scenes and cameras, rendered as flat data and painted in numpy from seeded noise; no brush, texture or image is loaded |
+| scene C, Rider's stop, painted full size (candidate, not yet shipped, written to `.cache/anime/c.png`) | `tools/anime_c.py` with `tools/bg_c_riders_stop.py` and the painter `tools/anime.py` | 12 | 16 (data renders) | original code-made art: a trail bike on a wet elevated road with a sign tower, drawn windows and thin cloud painted in numpy; no image, brush or font is loaded |
 | the animated rough sheet (not shipped) | `tools/anime_sheet.sh` | | | the images above as labelled tiles |
 
 ## Technique
