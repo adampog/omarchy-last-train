@@ -103,6 +103,7 @@ class Look:
     strokes: float = 0.0          # how far the smears on wet ground break into separate brush strokes
     unshaded: object = None       # unshaded(pic) gives where the key's cast shadow is left out: a mask
     no_ink: object = None         # no_ink(pic) gives how much of the pen line is taken off, 0 to 1 per pixel
+    disc_sky: bool = False        # the painted halos fall on open sky only, never on a wall behind the lamp
     rain_thin: object = None      # rain_thin(pic) gives how much of the rain is taken off, 0 to 1 per pixel
     offset: float = 1000.0        # added to positions so the data render holds no negative numbers
     extra: dict = field(default_factory=dict)
@@ -297,7 +298,7 @@ class Picture:
         reach = float(np.linalg.norm(np.array(place, np.float32) - self.eye))
         yy, xx = np.ogrid[:self.shape[0], :self.shape[1]]
         r = np.hypot(yy - row, xx - col).astype(np.float32) * (reach / self.f)
-        behind = self.dist > reach - 0.5
+        behind = ~self.solid if self.look.disc_sky else self.dist > reach - 0.5
         return [(1 - pt.step(edge * 0.3, edge * 1.1, r)) * behind for edge in radii]
 
     def halo_field(self):
@@ -437,6 +438,11 @@ def smears(pic, out, rng):
     ok = (from_row >= 0) & (rows > hz)
     r = np.where(ok[:, None, None], lightmap[np.clip(from_row, 0, h - 1)], 0.0).astype(np.float32)
     r = pt.blur(r, 60 * k, axes=(0,))
+    # wet ground keeps nothing of the upright shape of what it reflects: each band of it drags the light
+    # sideways, some bands a little and some a long way, so a row of windows comes back as one broken band
+    drag = pt.step(0.3, 0.7, pt.noise(pic.shape, (9 * k, 700 * k), np.random.default_rng(pic.look.seed + 400)))
+    short, long = pt.blur(r, 38 * k, axes=(1,)), pt.blur(r, 120 * k, axes=(1,))
+    r = short + (long - short) * drag[..., None]
     gap = 0.3
     if pic.look.strokes:  # a brush pulls the light down in strokes: each its own width, start, end and strength
         s = pic.look.strokes
