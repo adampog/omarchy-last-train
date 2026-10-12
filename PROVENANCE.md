@@ -14,7 +14,18 @@ traced from another work or made by an image-generation model. No third-party te
 | scenes B and C at full size, in progress (no image committed yet) | `tools/bg_b_moored_lantern.py`, `tools/bg_c_riders_stop.py` | 11, 12 | 160 | original code-made art: the lantern sphere in low cloud on its roof, and the parked trail bike of tubes and boxes on an elevated road |
 | roughs of scenes B to G (860x360, not shipped, written to `.cache/roughs/`) | `tools/roughs.py` | 11 to 16 | 64 | original code-made art: a lantern sphere on a roof, a parked trail bike of boxes and tubes, a mast and tank, a box-car train on a viaduct, a tunnel mouth, an alley counter |
 | the rough sheet (not shipped) | `tools/rough_sheet.sh` | | | the images above as labelled tiles |
-| animated-look tests of scene A (not shipped, written to `.cache/anime/`; no treatment chosen yet) | `tools/anime_a.py` with `tools/paint.py`, sheet by `tools/anime_sheet.sh` | 7 | 16 (data renders), 128 (the T1 cel render) | original code-made art: the same street, sign and camera as `a-rain-gate`, rendered as flat data and painted in numpy from seeded noise (flat tones, pen lines, painted sky, drawn halos, smears, rain, grain); no brush, texture or image is loaded |
+| animated-look tests of scene A, three treatments (not shipped; the scripts as tested are at commit 0585ba5) | `tools/anime_a.py` with `tools/paint.py` | 7 | 16 (data renders), 128 (the dropped cel render) | original code-made art: the same street, sign and camera as `a-rain-gate`; the second treatment was chosen and is the technique below |
+| animated roughs of scenes A to G and of background 06 (not shipped, written to `.cache/anime/`) | `tools/anime.py` (the painter) with `tools/paint.py`; `tools/anime_a.py` for A, `tools/anime_roughs.py` for B to G and 06 | A 7, B to G 11 to 16, 06 1 | 16 (data renders) | original code-made art: the committed scenes and cameras, rendered as flat data and painted in numpy from seeded noise; no brush, texture or image is loaded |
+| the animated rough sheet (not shipped) | `tools/anime_sheet.sh` | | | the images above as labelled tiles |
+
+## Technique
+
+The backgrounds are painted, not rendered as pictures. Blender renders each scene five times as plain data
+(local colour, emission, position, surface direction and a hard shadow mask from the one key light), and
+`tools/anime.py` paints the picture from that data in numpy: a gradient sky, stepped far-city silhouettes, one
+flat local colour and one flat shadow tone per surface, pen lines on edges, drawn lamps and halos, smears on wet
+ground, rain streaks, uneven pigment in the colour fields, a darker top edge and one even grain. All of it comes
+from seeded noise and the colours in `colors.toml`.
 
 Each new image gets a row here in the commit that adds it. Final file names are given when the set is chosen.
 

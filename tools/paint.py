@@ -183,6 +183,30 @@ def puffs(shape, at, height, width, count, rng, lean=0.35):
     return out
 
 
+def plume(shape, at, height, width, rng, lean=0.2, toward=-1, points=9):
+    """Steam as one tall flat shape cut by hand: straight cuts between a few displaced points, widening as it
+    climbs, thinner at the very top and fading to nothing. Returns the shape (0 to 1, with its fade) and the part
+    of it on the side toward the light (`toward` is -1 for left, 1 for right)."""
+    h, w = shape
+    y0, x0 = at
+    t = np.linspace(0, 1, points)
+    full = (0.3 + 0.9 * t) * np.where(t > 0.7, 1 - 0.8 * (t - 0.7) / 0.3, 1.0)
+    centre = x0 + lean * height * t + rng.uniform(-0.3, 0.3, points) * width * t
+    left = centre - width * full * rng.uniform(0.65, 1.3, points)
+    right = centre + width * full * rng.uniform(0.65, 1.3, points)
+    part = left + (right - left) * rng.uniform(0.22, 0.42, points) if toward < 0 else \
+        right - (right - left) * rng.uniform(0.22, 0.42, points)
+    rows = np.arange(h, dtype=np.float32)
+    tt = (y0 - rows) / max(height, 1.0)
+    inside = (tt >= 0) & (tt <= 1)
+    lo, hi, cut = (np.interp(tt, t, v).astype(np.float32)[:, None] for v in (left, right, part))
+    xx = np.arange(w, dtype=np.float32)[None, :]
+    body = ((xx > lo) & (xx < hi) & inside[:, None]).astype(np.float32)
+    fade = np.clip(1 - tt, 0, 1) ** 1.3 * np.clip(tt * 12, 0, 1)
+    lit = body * ((xx < cut) if toward < 0 else (xx > cut))
+    return body * fade[:, None].astype(np.float32), lit
+
+
 def grain(a, amount, rng):
     """One even grain over the whole picture, the same everywhere, so it reads as paper."""
     g = rng.standard_normal(a.shape[:2], dtype=np.float32)

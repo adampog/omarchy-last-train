@@ -1,32 +1,30 @@
 #!/usr/bin/env bash
-# The animated-look tests of scene A for review: each treatment at full size, at 1720 wide and as the centred
-# 16:9 crop, a labelled sheet beside the round 1 render, and 1:1 crops of the sign, the wet road and a far tower.
-#   tools/anime_sheet.sh <out-dir>      (after: uv run tools/anime_a.py --treatment t1, then t2, then t3)
+# The animated rough sheet for review: scenes A to G and background 06 through the painter, as labelled tiles
+# 860 wide on one sheet, plus each picture at 1720 wide.
+#   tools/anime_sheet.sh <out-dir>
+# after:  uv run tools/anime_a.py --percent 50   and   uv run tools/anime_roughs.py --scene all
 set -euo pipefail
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 out="${1:?out dir}"
+src="${2:-$repo/.cache/anime}"
 tmp="$(mktemp -d)"
 font=/usr/share/fonts/liberation/LiberationSans-Regular.ttf
 ink="$(grep '^foreground' "$repo/colors.toml" | cut -d'"' -f2)"
 paper="$(grep '^background' "$repo/colors.toml" | cut -d'"' -f2)"
 
-tile() {  # tile <image> <label> <name>
-  magick "$1" -resize 860x360! -font "$font" -pointsize 20 -fill "$ink" -undercolor "$paper" \
+tile() {  # tile <image> <label> <order> <name>
+  magick "$src/$1" -alpha off -resize 1720x "$out/$4-1720.png"
+  magick "$src/$1" -alpha off -resize 860x360! -font "$font" -pointsize 20 -fill "$ink" -undercolor "$paper" \
     -gravity SouthWest -annotate +10+8 " $2 " "$tmp/$3.png"
 }
-tile "$repo/backgrounds/a-rain-gate.png" "A, round 1: the path-traced render, for comparison" 1
-tile "$repo/.cache/anime/a-t1.png" "T1  cel in the renderer: Toon, Freestyle, value steps" 2
-tile "$repo/.cache/anime/a-t2.png" "T2  data renders, then painted in numpy" 3
-tile "$repo/.cache/anime/a-t3.png" "T3  T2 toward gouache: stepped halos, brush filter" 4
-magick montage "$tmp"/[1-4].png -tile 2x2 -geometry +6+6 -background "$paper" "$out/anime-sheet.png"
-for t in t1 t2 t3; do
-  src="$repo/.cache/anime/a-$t.png"
-  magick "$src" -alpha off "$out/A-$t-3440x1440.png"
-  magick "$src" -resize 1720x -quality 93 "$out/A-$t-1720.jpg"
-  magick "$src" -crop 2560x1440+440+0 +repage -resize 1280x -quality 93 "$out/A-$t-crop-440-3000-at-1280.jpg"
-  magick "$src" -crop 900x700+900+250 +repage "$out/A-$t-1to1-sign.png"
-  magick "$src" -crop 900x600+1500+840 +repage "$out/A-$t-1to1-wet-road.png"
-  magick "$src" -crop 800x560+1560+130 +repage "$out/A-$t-1to1-far-tower.png"
-done
+tile a.png "A  Rain gate" 1 A
+tile rough-b.png "B  Moored lantern" 2 B
+tile rough-c.png "C  Rider's stop" 3 C
+tile rough-d.png "D  Signal roof" 4 D
+tile rough-e.png "E  Last train" 5 E
+tile rough-f.png "F  Tunnel mouth" 6 F
+tile rough-g.png "G  The counter" 7 G
+tile rough-06.png "06  Omarchy over the city, restyled" 8 06-restyled
+magick montage "$tmp"/[1-8].png -tile 2x4 -geometry +6+6 -background "$paper" "$out/anime-rough-sheet.png"
 rm -r "$tmp"
 echo "wrote $out"
