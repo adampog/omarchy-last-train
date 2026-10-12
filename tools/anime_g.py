@@ -89,8 +89,8 @@ def under(pic, out, rng):
     near = wall & (dy + wob < half * 0.62)
     step = wall & (dy + wob < half) & ~near
     fade = np.clip((rows - 160 * k) / (480 * k), 0, 1)
-    out = pt.mixa(out, pt.rgb(WARM_WALL), near * 0.6 * fade)
-    out = pt.mixa(out, pt.rgb(WARM_STEP), step * 0.45 * fade)
+    out = pt.mixa(out, pt.rgb(WARM_WALL), near * 0.8 * fade)
+    out = pt.mixa(out, pt.rgb(WARM_STEP), step * 0.62 * fade)
     # the left wall: one flat dark tone, then the drawn things (nothing soft and round)
     lw = left_wall(pic)
     out = pt.mixa(out, pt.rgb(LEFT_WALL), lw * 0.85 * np.clip((rows - 60 * k) / (500 * k), 0, 1))
@@ -116,18 +116,18 @@ def under(pic, out, rng):
     pool = gd & (((x - 2.3 + pw) / 2.6) ** 2 + ((y - 11.0 + pw) / 2.4) ** 2 < 1)
     out = pt.mixa(out, pt.rgb(POOL), pt.blur(pool.astype(np.float32), 5 * k) * 0.4)
     r0 = pic.at((2.3, 13.6, 0.0))[0]
-    strip = np.floor(np.log1p(np.maximum(rows - r0, 0) / (14 * k)) * 4).astype(int)
-    gap = rng.random(64)[strip % 64] < 0.4
+    strip = np.floor(np.maximum(rows - r0, 0) / (16 * k)).astype(int)
+    gap = rng.random(64)[strip % 64] < 0.55
     smear = np.zeros(pic.shape, np.float32)
     sid = strip % 64
     for i, (lx, power, reach_px) in enumerate(((1.45, 0.4, 560), (2.05, 0.4, 620), (2.65, 0.3, 330), (3.25, 0.4, 480))):
         c = pic.at((lx, 13.25, 0.0))[1]
-        width = rng.uniform(12, 26, 64)[sid] * k
-        shift = rng.uniform(-10, 10, 64)[sid] * k
+        width = rng.uniform(34, 60, 64)[sid] * k
+        shift = rng.uniform(-30, 30, 64)[sid] * k
         short = rng.uniform(0.5, 1.0, 64)[sid]
         m = (np.abs(cols - c - shift) < width) * (rows > r0) * (1 - gap * 0.9) * np.clip(1.2 - (rows - r0) / (reach_px * k * short), 0, 1)
-        smear = np.maximum(smear, pt.blur(m.astype(np.float32), 1.6 * k) * (power / 0.4))
-    out = pt.mixa(out, pt.rgb(tk.mix(ORANGE, PALE, 0.25)), (smear * gd * 0.55).astype(np.float32))
+        smear = np.maximum(smear, pt.blur(m.astype(np.float32), 4.5 * k) * (power / 0.4))
+    out = pt.mixa(out, pt.rgb(tk.mix(ORANGE, PALE, 0.25)), (smear * gd * 0.42).astype(np.float32))
     # the alley's far end: one faint paler haze band at the foot of the end wall
     endw = pic.solid & (y > 60) & (pic.n[..., 1] < -0.5) & (z < 6.0)
     out = pt.mixa(out, pt.rgb(HAZE), (endw * np.clip(1 - z / 6.0, 0, 1) * 0.5).astype(np.float32))
@@ -170,7 +170,7 @@ def over(pic, out, rng):
 
 LOOK = an.Look(
     name="g", seed=g.SEED, build=build, key_at=(2.3, 12.6, 1.9), key_colour=ORANGE,
-    rings=(2.6, 4.6, 7.5), amounts=(0.3, 0.1, 0.03),
+    rings=(2.6, 4.6, 7.5), amounts=(0.0, 0.0, 0.0), disc_sky=True,
     glows=(an.Glow(an.within((1.2, 13.0, 2.0), (3.5, 13.5, 2.6)), "paper", core=9.0, halo=((30, 0.35),), smear=1.4),
            an.Glow(an.within((-4.6, 17.9, 0.3), (-4.3, 19.0, 1.8)), halo=((14, 0.8), (60, 1.2)), smear=1.0)),
     discs=((G_AT, (1.6, 4.0), (0.3, 0.14), ORANGE),),
