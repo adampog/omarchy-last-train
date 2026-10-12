@@ -6,24 +6,31 @@ traced from another work or made by an image-generation model. No third-party te
 
 ## Assets
 
-| Asset | Made by | Seed | Samples | Origin |
-|---|---|---|---|---|
-| `colors.toml`, `neovim.lua`, `btop.theme`, `chromium.theme`, `icons.theme` | written by hand | | | the theme palette and configuration |
-| `backgrounds/06-last-train-omarchy-skyline.png` | `tools/bg6_wordmark.py` | 1 | 64 | original code-made art: the Omarchy wordmark extruded, over a city of procedural boxes |
-| `backgrounds/a-rain-gate.png` | `tools/bg_a_rain_gate.py` | 7 | 160 | original code-made art: a wet street of procedural boxes under a sign stack of plain frames, bars and a ring, with no lettering |
-| scenes B and C at full size, in progress (no image committed yet) | `tools/bg_b_moored_lantern.py`, `tools/bg_c_riders_stop.py` | 11, 12 | 160 | original code-made art: the lantern sphere in low cloud on its roof, and the parked trail bike of tubes and boxes on an elevated road |
-| roughs of scenes B to G (860x360, not shipped, written to `.cache/roughs/`) | `tools/roughs.py` | 11 to 16 | 64 | original code-made art: a lantern sphere on a roof, a parked trail bike of boxes and tubes, a mast and tank, a box-car train on a viaduct, a tunnel mouth, an alley counter |
-| the rough sheet (not shipped) | `tools/rough_sheet.sh` | | | the images above as labelled tiles |
-| animated-look tests of scene A, three treatments (not shipped; the scripts as tested are at commit 0585ba5) | `tools/anime_a.py` with `tools/paint.py` | 7 | 16 (data renders), 128 (the dropped cel render) | original code-made art: the same street, sign and camera as `a-rain-gate`; the second treatment was chosen and is the technique below |
-| animated roughs of scenes A to G and of background 06 (not shipped, written to `.cache/anime/`) | `tools/anime.py` (the painter) with `tools/paint.py`; `tools/anime_a.py` for A, `tools/anime_roughs.py` for B to G and 06 | A 7, B to G 11 to 16, 06 1 | 16 (data renders) | original code-made art: the committed scenes and cameras, rendered as flat data and painted in numpy from seeded noise; no brush, texture or image is loaded |
-| scene C, Rider's stop, painted full size (candidate, not yet shipped, written to `.cache/anime/c.png`) | `tools/anime_c.py` with `tools/bg_c_riders_stop.py` and the painter `tools/anime.py` | 12 | 16 (data renders) | original code-made art: a trail bike on a wet elevated road with a sign tower, drawn windows and thin cloud painted in numpy; no image, brush or font is loaded |
-| scene E, Last train, painted full size (candidate, not yet shipped, written to `.cache/anime/e.png`) | `tools/anime_e.py` with `tools/bg_e_last_train.py` and the painter `tools/anime.py` | 14 | 16 (data renders) | original code-made art: a three-car train on a viaduct over a canal, drawn tower windows and reflection bands painted in numpy; no image, brush or font is loaded |
-| scene G, The counter, painted full size (candidate, not yet shipped, written to `.cache/anime/g.png`) | `tools/anime_g.py` with `tools/bg_g_the_counter.py` and the painter `tools/anime.py` | 16 | 16 (data renders) | original code-made art: a night food stall in a wet alley, a flat warm wall tone, counter front and kettle steam painted in numpy; no image, brush or font is loaded |
-| scene D, Signal roof, painted full size (candidate, not yet shipped, written to `.cache/anime/d.png`) | `tools/anime_d.py` with `tools/bg_d_signal_roof.py` and the painter `tools/anime.py` | 13 | 16 (data renders) | original code-made art: a roof with a red beacon mast, a tank, two dishes and layered far city, painted in numpy; no image, brush or font is loaded |
-| scene F, Tunnel mouth, painted full size (candidate, not yet shipped, written to `.cache/anime/f.png`) | `tools/anime_f.py` with `tools/bg_f_tunnel_mouth.py` and the painter `tools/anime.py` | 15 | 16 (data renders) | original code-made art: a wet road bending into a lit tunnel under a stepped retaining wall, painted in numpy; no image, brush or font is loaded |
-| scene B, Moored lantern, painted full size (candidate, not yet shipped, written to `.cache/anime/b.png`) | `tools/anime_b.py` with `tools/bg_b_moored_lantern.py` and the painter `tools/anime.py` | 11 | 16 (data renders) | original code-made art: a paper lantern moored to a wet roof, low cloud among far towers, and a vent and a cable on the near parapet, painted in numpy; no image, brush or font is loaded |
-| the animated rough sheet (not shipped) | `tools/anime_sheet.sh` | | | the images above as labelled tiles |
-| the final sheet (not shipped) | `tools/anime_final_sheet.sh` | | | the eight painted backgrounds as labelled tiles under the theme's name |
+Every shipped file, with the command that makes it. Samples: each painted scene is rendered as five data passes
+at the script default of 16 samples (the painting itself is numpy, not sampled). All eight backgrounds are
+3440x1440 and original code-made art. `tools/make_backgrounds.sh` runs the eight commands in order and writes
+the shipped names; `python3 tools/build_preview.py` makes the three preview and unlock images.
+
+| Asset | Command | Scene commit | Seed | Samples | sha256 | Origin |
+|---|---|---|---|---|---|---|
+| `backgrounds/last-train-01-rain-gate.png` | `uv run tools/anime_a.py` | 41934d7 | 7 | 16 | 59b0cba4a6b41ee625507144a853030bf4b6d77a3fb4bd262869209481304b4b | original code-made art: a wet street under a sign stack of plain frames, bars and a ring, no lettering |
+| `backgrounds/last-train-02-moored-lantern.png` | `uv run tools/anime_b.py` | 4dcfabc | 11 | 16 | a7513411c364f089375fba094baffb2bf1f03b9123d140816552c20c2ddc2ee0 | original code-made art: a paper lantern moored to a wet roof, low cloud among far towers |
+| `backgrounds/last-train-03-riders-stop.png` | `uv run tools/anime_c.py` | b5eab30 | 12 | 16 | ec13eaa486c75ec4962597b3e65cf7ed33686f32169b80dd336d654bd82e431a | original code-made art: a trail bike of tubes and boxes on a wet elevated road, sign tower, thin cloud |
+| `backgrounds/last-train-04-signal-roof.png` | `uv run tools/anime_d.py` | e332627 | 13 | 16 | c873b7972cca37a70bf2688ed44dc646d2821e9b0ffd71e8c4374770053c8328 | original code-made art: a roof with a red beacon mast, a tank, two dishes and layered far city |
+| `backgrounds/last-train-05-last-train.png` | `uv run tools/anime_e.py` | 67003e3 | 14 | 16 | 61b742c91a5e6a6fbcb6c618115a338060a0b177ccc742178daab7178f87718b | original code-made art: a three-car train on a viaduct over a canal, broken reflection bands |
+| `backgrounds/last-train-06-tunnel-mouth.png` | `uv run tools/anime_f.py` | 90de698 | 15 | 16 | 5904a5899275ba4d7ad9053edb6fbbb2436dccf145fc85f03a2ce7846c177d58 | original code-made art: a wet road bending into a lit tunnel under a stepped retaining wall |
+| `backgrounds/last-train-07-the-counter.png` | `uv run tools/anime_g.py` | 16c7dcf | 16 | 16 | 0d141dfe2ba942472bf88d05a87491a8ced82a3c0be2930adf9c8cc249f62514 | original code-made art: a night food stall in a wet alley, flat warm wall tone, kettle steam |
+| `backgrounds/last-train-08-omarchy-over-the-city.png` | `uv run tools/anime_roughs.py --scene 06 --percent 100` | d9fa22e | 1 | 16 | 9741d1d8d3617423a2e01e7463d0154658f833f38e67cd6afc7e4e1ca347fa2c | original code-made art: the Omarchy wordmark extruded over a city, painted in the same style (the mark itself is Omarchy's) |
+| `unlock.png` | `python3 tools/build_preview.py` | | | | 8fe93fd7cfb86b3e24ccb856bec9a8540892c42e270a76dc4ff9868ca2be9651 | the Omarchy wordmark in the accent colour, drawn from Omarchy's logo.svg |
+| `preview-unlock.png` | `python3 tools/build_preview.py` | | | | dcc6800174453b044d846f9a5e61b9faf21a8ebe1651813c28597ff2a0f917dc | the unlock image over the background colour with a padlock and a field, drawn as vector shapes |
+| `preview.png` | `python3 tools/build_preview.py` | | | | ccad1edf9561c6e719a9b93bb4ed22e281d96e3d85738d6670604c146400276f | the palette as an editor and a terminal, with background 05 in the art panel |
+| `colors.toml`, `neovim.lua`, `btop.theme`, `chromium.theme`, `icons.theme` | written by hand | | | | | the theme palette and configuration |
+
+All eight backgrounds are painted by `tools/anime.py` (painter commit 4dcfabc) with `tools/paint.py`, from the
+geometry in the matching `tools/bg_*.py` (scene 08 from `tools/bg6_wordmark.py`, through `tools/anime_roughs.py`).
+The approved files are frozen: a fresh render matches them to within a few pixels of GPU sampling noise, not
+byte for byte (see the README). Scenes that were tried and dropped, rough sheets and review folders are
+development material in `.cache/` and are not shipped.
 
 ## Technique
 
@@ -37,7 +44,14 @@ wet ground, steam as a thin low veil with a ragged cut edge that the street show
 and one even grain. All of it comes
 from seeded noise and the colours in `colors.toml`.
 
-Each new image gets a row here in the commit that adds it. Final file names are given when the set is chosen.
+## Contrast
+
+`omarchy dev theme preview . --no-osc` on 2026-10-12 (it prints and applies nothing): mode dark, foreground
+`#f2ece4` on background `#0a0a0f` is 16.83:1 (target 4.5). Every text colour on the background, from
+`tools/build_preview.py`, which refuses a palette below target: red and accent 5.57, green 10.51, yellow 11.06,
+blue 6.01, magenta 7.51, cyan 10.30, muted 5.70, bright_red 7.07, bright_green 13.77, bright_yellow 13.77,
+bright_blue 9.25, bright_magenta 10.02, bright_cyan 13.07, light_foreground 13.14, bright_foreground 16.83,
+dark_foreground 9.47, orange 9.44 (target 3.0 each; lowest 5.57).
 
 ## Colours
 
@@ -46,8 +60,9 @@ code. They contain no colour values of their own.
 
 ## The Omarchy wordmark
 
-`tools/bg6_wordmark.py` reads `/usr/share/omarchy/logo.svg` from the installed Omarchy at render time. That file
-and `colors.toml` are the only files it reads. The wordmark is Omarchy's own mark, not ours. It is used unaltered,
+`tools/bg6_wordmark.py` (background 08) and `tools/build_preview.py` (`unlock.png`, `preview-unlock.png`) read
+`/usr/share/omarchy/logo.svg` from the installed Omarchy at render time. That file and `colors.toml` are the only
+files they read. The wordmark is Omarchy's own mark, not ours. It is used unaltered,
 as Omarchy's stock themes use it, and no copy of the SVG is kept in this repository.
 
 ## Tools
@@ -58,6 +73,7 @@ as Omarchy's stock themes use it, and no copy of the SVG is kept in this reposit
 | Python 3.13 | running the scripts | PSF-2.0 |
 | uv | installing the pinned packages | MIT or Apache-2.0 |
 | ImageMagick | resizing, previews and checks | ImageMagick License |
+| rsvg-convert (librsvg) | turning the preview SVGs into PNGs | LGPL-2.1-or-later |
 
 The scripts are this repository's own code under its MIT licence, including the shared helpers in
 `tools/scenes.py` and the city kit in `tools/city.py` (building faces, wet road, tubes, mist, haze, low cloud, steam), which
@@ -67,10 +83,11 @@ the program, not the images made with it.
 
 ## Fonts
 
-The only lettering in any background is the Omarchy wordmark in background 06, drawn from
+The only lettering in any background is the Omarchy wordmark in background 08, drawn from
 `/usr/share/omarchy/logo.svg`, which is Omarchy's own mark. No background uses a font. Any font added later must
 be openly licensed and is listed here with its licence.
 
 | Font | Used for | Path | Licence |
 |---|---|---|---|
+| JetBrainsMono Nerd Font | the code and palette text inside `preview.png`, drawn into the image; the font itself is not shipped | `/usr/share/fonts/TTF/JetBrainsMonoNerdFont-*.ttf` (package ttf-jetbrains-mono-nerd-basic 3.5.1) | SIL OFL 1.1 (JetBrains Mono); the Nerd Fonts patching is MIT |
 | Liberation Sans Regular | tile labels and the title on the review sheets only, which are not shipped | `/usr/share/fonts/liberation/LiberationSans-Regular.ttf` | SIL OFL 1.1, `/usr/share/licenses/ttf-liberation/LICENSE` |
