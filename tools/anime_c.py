@@ -98,6 +98,23 @@ def under(pic, out, rng):
     # the near row of city a step darker than the rows behind it
     row_near = pic.solid & (pic.dist > 150) & (pic.dist < 205) & ~pic.flat
     out = pt.mixa(out, pt.rgb(an.BG), row_near * 0.55)
+    # the city's warm light in the road's right half: broad faint smears, lower in tone than the red column
+    rows = np.arange(pic.shape[0], dtype=np.float32)[:, None]
+    cols = np.arange(pic.shape[1], dtype=np.float32)[None, :]
+    W = pic.shape[1]
+    hz = pic.at((15.0, 400.0, Z))[0]
+    strip = np.floor(np.maximum(rows - hz, 0) / (15 * k)).astype(int)
+    gap = rng.random(64)[strip % 64] < 0.35
+    edges = np.cumsum(rng.uniform(70, 220, 300)) * k
+    cid = np.searchsorted(edges, cols[0])[None, :]
+    keep = rng.random((64, 300))[strip % 64, cid % 300] > 0.45
+    fade = np.clip((cols - 0.58 * W) / (0.2 * W), 0, 1) * np.clip(1 - np.maximum(rows - hz, 0) / (300 * k), 0, 1)
+    sm = (keep * (1 - gap) * fade).astype(np.float32)
+    wide = sm.copy()
+    for sh in range(6, int(70 * k) + 1, 6):
+        wide = np.maximum(wide, np.maximum(np.roll(sm, sh, 1), np.roll(sm, -sh, 1)))
+    field = pt.blur(wide, 2.0 * k)
+    out = pt.mixa(out, pt.rgb(tk.mix(ORANGE, an.SEL, 0.35)), (field * level(pic) * 0.24).astype(np.float32))
     # the post: a cap a step lighter, and a line a third of the way down
     row, col = pic.at((POST[0], POST[1], Z + 0.2))
     post = pic.solid & an.inbox(pic.pos, (POST[0] - 0.12, POST[1] - 0.12, Z), (POST[0] + 0.12, POST[1] + 0.12, Z + 0.56))
@@ -121,6 +138,22 @@ def over(pic, out, rng):
     out = pt.mixa(out, pt.rgb(an.LINE), pt.blur(rim, 0.5 * k) * 0.6)
     edge = ((r > 0.93) & (r < 1.0) & (cols > cx + 0.4 * 50 * k)).astype(np.float32)
     out = pt.mixa(out, pt.rgb(tk.mix(P["bright_blue"], PALE, 0.4)), pt.blur(edge, 0.6 * k) * 0.7)
+    # the instrument dot on the handlebar goes: the bar's dark shape closes over it
+    dot = np.hypot((cols - 1320 * k) / (14 * k), (rows - 492 * k) / (10 * k)) < 1
+    out = pt.mixa(out, pt.rgb(DARK), pt.blur(dot.astype(np.float32), 0.8 * k) * 0.97)
+    # the nearest block at right: one lit top-edge line and one drawn vent
+    x, y, z = pic.pos[..., 0], pic.pos[..., 1], pic.pos[..., 2]
+    blk = pic.solid & ~pic.far & (np.abs(y - 190.5) < 0.6) & (np.abs(pic.n[..., 1]) > 0.5) & (x > 25) & (x < 80)
+    zt = z[blk].max()
+    xs = x[blk]
+    edge_t = blk & (z > zt - 0.45)
+    out = pt.mixa(out, pt.rgb(tk.mix(ORANGE, an.SEL, 0.45)), pt.blur(edge_t.astype(np.float32), 0.6 * k) * 0.8)
+    vx0 = xs.min() + (xs.max() - xs.min()) * 0.3
+    (r1, c1), (r0, c0) = pic.at((vx0 + 3.2, 190.5, zt)), pic.at((vx0, 190.5, zt + 1.7))
+    vent = ((rows >= r0) & (rows < r1) & (cols >= c0) & (cols < c1)).astype(np.float32)
+    vedge = ((vent > 0) & ((rows < r0 + 2 * k) | (cols < c0 + 2 * k))).astype(np.float32)
+    out = pt.mixa(out, pt.rgb(DARK), pt.blur(vent, 0.5 * k) * 0.95)
+    out = pt.mixa(out, pt.rgb(tk.mix(ORANGE, an.SEL, 0.45)), pt.blur(vedge, 0.5 * k) * 0.5)
     s = max(1, int(round(3 * pic.k)))
     edge = pic.flat & ~np.roll(pic.flat, s, 1)
     return pt.mixa(out, pt.rgb(tk.mix(P["blue"], P["bright_blue"], 0.5)), pt.blur(edge.astype(np.float32), 0.6 * pic.k) * 0.8)
@@ -129,8 +162,7 @@ def over(pic, out, rng):
 LOOK = an.Look(
     name="c", seed=c.SEED, build=build, key_at=(-9.0, 1.0, Z + 3.5), key_colour=P["blue"],
     rings=(9.0, 15.0, 24.0), amounts=(0.3, 0.17, 0.07),
-    glows=(an.Glow(an.within((12.9, 239.0, 43.9), (17.1, 240.6, 56.1)), halo=((16, 1.2), (90, 2.4)), colour=RED),
-           an.Glow(an.within(*BIKE_BOX), halo=((7, 3.0),), colour=CYAN)),
+    glows=(an.Glow(an.within((12.9, 239.0, 43.9), (17.1, 240.6, 56.1)), halo=((16, 1.2), (90, 2.4)), colour=RED),),
     discs=(((52.0, 225.0, 30.0), (45.0, 100.0), (0.3, 0.18), ORANGE),),
     tier_at=(205.0, 330.0, 520.0), veil=((90.0, 0.2), (160.0, 0.36)), wet=level,
     flats=((*BIKE_BOX, DARK),), dress=dress, under=under, over=over, wobble=1.6, hesitate=True, cut=3.0,
