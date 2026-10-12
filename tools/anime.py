@@ -257,7 +257,10 @@ class Picture:
         self.depth = np.where(self.solid, rel @ fwd, 1e5).astype(np.float32)
         self.dist = np.where(self.solid, np.linalg.norm(rel, axis=-1), 1e5).astype(np.float32)
         self.n = d["nrm"][..., :3] * 2 - 1
-        self.far = self.solid & (self.dist >= look.tier_at[0])
+        # how far off a thing is, for the steps of distance, is measured straight ahead: a wall that faces us is
+        # then one step all over, where the distance from the eye would cut a round patch out of it
+        self.away = self.depth
+        self.far = self.solid & (self.away >= look.tier_at[0])
         flat = np.array((fwd[0], fwd[1], 0.0), np.float32)
         self.horizon = self.at(self.eye + flat / np.linalg.norm(flat) * 1e5)[0]
         lin = d["emit"][..., :3]
@@ -354,23 +357,22 @@ def far_city(pic, out, rng):
     at = pic.look.tier_at
     for k, colour in enumerate(TIERS):
         hi = at[k + 1] if k + 1 < len(TIERS) else 1e6
-        m = pic.solid & (pic.dist >= at[k]) & (pic.dist < hi)
+        m = pic.solid & (pic.away >= at[k]) & (pic.away < hi)
         tone = pt.mixa(np.broadcast_to(pt.rgb(colour), out.shape), pt.rgb(SKYLIGHT), np.where(lamb > 0.4, 0.1, 0.0))
         out = np.where(m[..., None], tone, out)
-    if pic.look.air:  # air: the foot of the far city is lost in tinted haze, in flat bands with a cut edge
+    if pic.look.air:  # air: the foot of the far city is lost in tinted haze that thickens toward the ground
         far = pic.far.astype(np.float32)
-        beyond = pic.far & (pic.dist >= at[1])  # only the nearest row keeps crisp stepped tops
+        beyond = pic.far & (pic.away >= at[1])  # only the nearest row keeps crisp stepped tops
         soft = pt.blur(out, 2.2 * pic.k)
         out = np.where(beyond[..., None], soft, out)
-        # the band edges are cut shapes: long slow rises with a shorter, sharper break laid over them
-        lift = 0.5 * (pt.noise(pic.shape, (40 * pic.k, 420 * pic.k), rng) - 0.5) \
-            + 0.3 * (np.round(pt.noise(pic.shape, (30 * pic.k, 110 * pic.k), rng) * 4) / 4 - 0.5)
+        # air is soft: it thickens evenly from one height to the next, and lies a little higher here and lower
+        # there in long slow rises. No edge is cut in it; only drawn things have edges.
+        lift = 0.5 * (pt.noise(pic.shape, (40 * pic.k, 420 * pic.k), rng) - 0.5)
         z = pic.pos[..., 2] * (1 + lift)
-        amount = np.zeros(pic.shape, np.float32)
-        for height, a in pic.look.air:
-            amount = np.where(z < height, a, amount)
-        lowest = min(h for h, _ in pic.look.air)
-        amount = np.maximum(amount, 0.92 * (1 - pt.step(lowest * 0.15, lowest * 0.8, z)))  # the foot fades right in
+        heights, amounts = zip(*sorted(pic.look.air))
+        lowest = heights[0]
+        amount = np.interp(z, (lowest * 0.15, lowest * 0.8) + heights[1:] + (heights[-1] * 1.35,),
+                           (0.92, amounts[0]) + amounts[1:] + (0.0,)).astype(np.float32)
         out = pt.mixa(out, pt.rgb(HAZE_FAR), pt.blur(amount * far, 1.5 * pic.k) * far)
     return out
 
@@ -387,7 +389,7 @@ def surfaces(pic, rng):
     tone = np.where(pic.flat[..., None], col, tone)
     veil = np.zeros(pic.shape, np.float32)  # haze laid over the middle distance as flat fields by depth band
     for beyond, amount in look.veil:
-        veil = np.where(pic.dist > beyond, amount, veil)
+        veil = np.where(pic.away > beyond, amount, veil)
     tone = pt.mixa(tone, pt.rgb(HAZE), veil * ~pic.flat)
     wobble = 1 + 0.16 * (pt.noise(pic.shape, 150 * k, rng) - 0.5)  # the rings are cut by hand, not by compass
     r = pic.r * wobble
