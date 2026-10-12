@@ -147,8 +147,12 @@ def build():
     tk.box("near_post_cap", (0.22, 0.22, 0.05), (-1.95, 2.65, z + 0.525), steel)  # its cap, a step wider
     bike((-2.4, 5.6, z), 26.0)
     # the city fills the right third, orange in its haze; one red window panel in it
-    rg.far(rng, count=200, near=260, spread=13, heights=(40, 110), glow=rg.HAZE_ORANGE, glow_strength=0.009,
-           top=100.0, lit=0.1, turn=14.0, tall=0.0, bay=2.2, floor_h=3.2)
+    # three rows of city, each its own mass: a near row, a middle row, a far one fading into the haze
+    mat = city.facade("far", rg.BODY_FAR, rg.GLASS, rg.WIN_A, rg.WIN_B, rg.WIN_WARM, bay=2.2, floor_h=3.2, lit=0.1,
+                      strength=0.9, warm_part=0.2, ground=6.0)
+    for near, far_, count, heights in ((150, 205, 12, (14, 28)), (270, 400, 50, (45, 105)), (520, 900, 80, (60, 130))):
+        city.skyline(rng, mat, None, count, near, far_, 13, heights, tall=0.0, turn=14.0)
+    city.haze_layer("far_haze", (0, 860, 55), (2400, 1200, 130), 100.0, 0.003, rg.MIST, rg.HAZE_ORANGE, 0.02, base=0.0)
     T = city.Boxes()
     T.box((11.0, 240, 0), (27.0, 262, 62))
     T.done("sign_tower", city.plain("sign_tower", rg.BODY, roughness=0.5))

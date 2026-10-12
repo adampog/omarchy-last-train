@@ -61,11 +61,16 @@ def level(pic):
 
 
 def dress(pic, rng):
-    """The sign tower's windows, drawn: uneven, in loose floors; the other far towers as small marks."""
+    """The near row: drawn uneven windows, few lit, most dark. The middle row and the sign tower: a few marks. The far
+    rows: none."""
+    upright = an.walls(pic)[0]
+    nearest = upright & (pic.dist < 205) & ~an.inbox(pic.pos, *TOWER)
+    an.windows(pic, rng, nearest, bay=3.6, floor_h=4.0, ground=3.0, part=0.3, warm=0.08, glass=WIN_DARK,
+               edge=WIN_EDGE, lit=WIN_WARM)
+    middle = upright & (pic.dist >= 205) & (pic.dist < 330) & ~an.inbox(pic.pos, *TOWER)
+    an.marks(pic, rng, middle, bay=4.6, floor_h=4.2, ground=2.0, part=0.25, warm=0.2, cool=WIN_COOL, lit=WIN_WARM)
     tower = an.inbox(pic.pos, *TOWER) & (np.abs(pic.n[..., 1]) > 0.5)
-    an.marks(pic, rng, pic.far & an.walls(pic)[0], bay=4.6, floor_h=4.2, ground=2.0, part=0.5, warm=0.2,
-             cool=WIN_COOL, lit=WIN_WARM)
-    an.marks(pic, rng, tower, bay=3.4, floor_h=3.6, ground=2.0, part=0.62, warm=0.22, cool=WIN_COOL, lit=WIN_WARM)
+    an.marks(pic, rng, tower, bay=3.4, floor_h=3.6, ground=2.0, part=0.5, warm=0.22, cool=WIN_COOL, lit=WIN_WARM)
 
 
 def under(pic, out, rng):
@@ -80,13 +85,19 @@ def under(pic, out, rng):
     # thin cloud: two long flat bands in the sky, a paler body with a warmer lower edge, lying behind the far city
     sky = ~pic.solid & ~pic.far
     y = np.arange(pic.shape[0], dtype=np.float32)[:, None]
-    for lo, hi, cover, amount in ((230, 350, 0.55, 0.2), (380, 440, 0.45, 0.14)):
+    for lo, hi, cover, amount in ((300, 360, 0.42, 0.22),):
         band = pt.step(lo * k, (lo + 30) * k, y) * (1 - pt.step((hi - 30) * k, hi * k, y))
-        n = pt.noise(pic.shape, (40 * k, 900 * k), rng)
+        n = pt.noise(pic.shape, (16 * k, 260 * k), rng)
         body = pt.step(1 - cover, 1 - cover + 0.03, n * (0.55 + 0.45 * band)) * (band > 0.02)
-        under_edge = body * (1 - np.roll(body, int(-5 * k), 0))
+        under_edge = body * (1 - np.roll(body, int(-9 * k), 1))  # lit on the city side, to the right
         out = pt.mixa(out, pt.rgb(CLOUD), pt.blur(body, 0.8 * k) * amount * sky)
         out = pt.mixa(out, pt.rgb(CLOUD_EDGE), pt.blur(under_edge, 0.8 * k) * amount * 1.2 * sky)
+    # the midground a step darker, so the city's glow owns the picture
+    near_ground = pic.solid & ~pic.flat & (pic.dist < 150)
+    out = pt.mixa(out, pt.rgb(an.BG), near_ground * 0.28)
+    # the near row of city a step darker than the rows behind it
+    row_near = pic.solid & (pic.dist > 150) & (pic.dist < 205) & ~pic.flat
+    out = pt.mixa(out, pt.rgb(an.BG), row_near * 0.55)
     # the post: a cap a step lighter, and a line a third of the way down
     row, col = pic.at((POST[0], POST[1], Z + 0.2))
     post = pic.solid & an.inbox(pic.pos, (POST[0] - 0.12, POST[1] - 0.12, Z), (POST[0] + 0.12, POST[1] + 0.12, Z + 0.56))
@@ -97,7 +108,19 @@ def under(pic, out, rng):
 
 
 def over(pic, out, rng):
-    """The blue light behind the bike drawn as a thin edge down its left side."""
+    """The blue light behind the bike drawn as a thin edge down its left side; the lamp a dark disc with a rim line and a
+    thin bright edge on its city side."""
+    k = pic.k
+    rows = np.arange(pic.shape[0], dtype=np.float32)[:, None]
+    cols = np.arange(pic.shape[1], dtype=np.float32)[None, :]
+    cx, cy = 1372 * k / 1.0 * 0.5 * 2, 608 * k
+    r = np.hypot((cols - cx) / (50 * k), (rows - cy) / (41 * k))
+    disc = (r < 1.0).astype(np.float32)
+    rim = ((r > 0.88) & (r < 1.0)).astype(np.float32)
+    out = pt.mixa(out, pt.rgb(DARK), pt.blur(disc, 0.5 * k) * 0.97)
+    out = pt.mixa(out, pt.rgb(an.LINE), pt.blur(rim, 0.5 * k) * 0.6)
+    edge = ((r > 0.93) & (r < 1.0) & (cols > cx + 0.4 * 50 * k)).astype(np.float32)
+    out = pt.mixa(out, pt.rgb(tk.mix(P["bright_blue"], PALE, 0.4)), pt.blur(edge, 0.6 * k) * 0.7)
     s = max(1, int(round(3 * pic.k)))
     edge = pic.flat & ~np.roll(pic.flat, s, 1)
     return pt.mixa(out, pt.rgb(tk.mix(P["blue"], P["bright_blue"], 0.5)), pt.blur(edge.astype(np.float32), 0.6 * pic.k) * 0.8)
@@ -109,7 +132,7 @@ LOOK = an.Look(
     glows=(an.Glow(an.within((12.9, 239.0, 43.9), (17.1, 240.6, 56.1)), halo=((16, 1.2), (90, 2.4)), colour=RED),
            an.Glow(an.within(*BIKE_BOX), halo=((7, 3.0),), colour=CYAN)),
     discs=(((52.0, 225.0, 30.0), (45.0, 100.0), (0.3, 0.18), ORANGE),),
-    tier_at=(230.0, 420.0, 640.0), veil=((90.0, 0.2), (160.0, 0.36)), wet=level,
+    tier_at=(205.0, 330.0, 520.0), veil=((90.0, 0.2), (160.0, 0.36)), wet=level,
     flats=((*BIKE_BOX, DARK),), dress=dress, under=under, over=over, wobble=1.6, hesitate=True, cut=3.0,
     ring_bands=0.5, body=(12.0, 0.16), shade_wobble=3.0, air=((130, 0.2), (70, 0.4), (30, 0.58)))
 
