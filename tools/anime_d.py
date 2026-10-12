@@ -109,12 +109,20 @@ def under(pic, out, rng):
     u, v = (x - BASE[0] + 1.0) / 6.0, (y - BASE[1] + 3.0 + wob) / 4.2
     pool = roof & (u * u + v * v < 1)
     out = pt.mixa(out, pt.rgb(POOL), pt.blur(pool.astype(np.float32), 5 * k) * 0.6)
-    r0 = pic.at(BASE)[0]
-    strip = np.floor(np.log1p(np.maximum(rows - r0, 0) / (18 * k)) * 5).astype(int)
-    gap = rng.random(64)[strip % 64] < 0.45
+    # the flat pool itself: one patch a step brighter red at the tank's foot and mast base, a hard wobbled edge
+    wob2 = (pt.noise(pic.shape, (25 * k, 40 * k), rng) - 0.5) * 0.9
+    pu, pv = (x - (d.TANK[0] + 0.5)) / 6.5, (y - (d.TANK[1] - 6.2) + wob2) / 2.6
+    patch = roof & (pu * pu + pv * pv < 1)
+    out = pt.mixa(out, pt.rgb(tk.mix(POOL, RED, 0.3)), pt.blur(patch.astype(np.float32), 0.8 * k) * 0.8)
+    # the mast's light: two or three long smears cut by the roof's dark bands
+    r0 = pic.at((BASE[0], d.TANK[1] - 5.0, Z))[0]
     c0 = pic.at(BASE)[1]
-    col = np.clip(1 - np.abs(cols - c0) / (60 * k), 0, 1) * (rows > r0) * (1 - gap) * np.clip(1 - (rows - r0) / (420 * k), 0, 1)
-    out = pt.mixa(out, pt.rgb(tk.mix(P["bright_red"], PALE, 0.15)), (pt.blur(col.astype(np.float32), 1.4 * k) * roof * 0.35).astype(np.float32))
+    u = np.maximum(rows - r0, 0) / k
+    band = ((u > 6) & (u < 70)) | ((u > 110) & (u < 200)) | ((u > 245) & (u < 320))
+    jag = (pt.noise(pic.shape, (6 * k, 40 * k), rng) > 0.45)
+    col = np.clip(1 - np.abs(cols - c0 - 14 * k * np.sin(rows / (60 * k))) / (70 * k), 0, 1) * (rows > r0) * band * jag
+    col = col * np.clip(1 - u / 330, 0.2, 1)
+    out = pt.mixa(out, pt.rgb(tk.mix(P["bright_red"], PALE, 0.15)), (pt.blur(col.astype(np.float32), 1.2 * k) * roof * 0.4).astype(np.float32))
     # the bottom strip of the roof a step darker
     out = pt.mixa(out, pt.rgb(an.BG), roof * np.clip((rows - 900 * k) / (400 * k), 0, 1) * 0.65)
     # the far city in depth bands: a haze band at the foot of each row, the nearest row a step darker
@@ -123,6 +131,18 @@ def under(pic, out, rng):
     out = pt.mixa(out, pt.rgb(HAZE), far_ * np.clip(1 - z / 45.0, 0, 1) * 0.55)
     nearrow = wallf & ~pic.far
     out = pt.mixa(out, pt.rgb(an.BG), nearrow * 0.25)
+    # the box right of the tank: one depth band back, haze at its foot, its top a step below the tank's rim
+    box = pic.solid & ~pic.far & (np.abs(y - 101.87) < 0.6) & (x > 28) & (x < 62) & (z < 66) & (z > Z)
+    foot = np.clip(1 - (z - Z) / 7.0, 0, 1)
+    out = pt.mixa(out, pt.rgb(HAZE), box * (0.55 + 0.3 * foot))
+    cols_has = box.any(0)
+    top = np.argmax(box, 0)
+    H, W = pic.shape
+    step = int(22 * k)
+    rr = np.arange(H)[:, None]
+    cut = cols_has[None, :] & (rr >= top[None, :]) & (rr < top[None, :] + step)
+    src = out[np.clip(top - 4, 0, H - 1), np.arange(W)][None, :, :]
+    out = np.where(cut[..., None], src, out)
     return out
 
 
