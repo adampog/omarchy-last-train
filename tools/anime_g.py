@@ -33,6 +33,9 @@ COUNTER = tk.mix(tk.mix(an.BG, an.SEL, 0.35), P["brown"], 0.3)
 COUNTER_LIT = tk.mix(COUNTER, ORANGE, 0.28)
 SHELF = tk.mix(an.BG, P["brown"], 0.35)
 CLOTH = tk.mix(tk.mix(an.SEL, P["blue"], 0.3), ORANGE, 0.08)
+LEFT_WALL = tk.mix(tk.mix(an.BG, an.SEL, 0.22), P["blue"], 0.06)
+LEFT_DARK = tk.mix(an.BG, an.SEL, 0.02)
+POOL = tk.mix(tk.mix(an.BG, an.SEL, 0.4), ORANGE, 0.3)
 STEAM = tk.mix(tk.mix(an.SEL, P["muted"], 0.42), ORANGE, 0.3)
 STEAM_LIT = tk.mix(tk.mix(PALE, ORANGE, 0.4), P["muted"], 0.3)
 
@@ -53,19 +56,74 @@ def right_wall(pic):
     return pic.solid & (pic.pos[..., 0] > 3.7) & (pic.n[..., 0] < -0.5) & (pic.pos[..., 1] < 60)
 
 
+def left_wall(pic):
+    return pic.solid & (pic.pos[..., 0] < -4.2) & (pic.n[..., 0] > 0.5) & (pic.pos[..., 1] < 60)
+
+
+def ground(pic):
+    return pic.solid & (pic.n[..., 2] > 0.7) & (pic.pos[..., 2] < 0.1) & (pic.pos[..., 1] < 60)
+
+
+def knots(v, pts):
+    """A straight-segment profile through (v, value) points."""
+    xs, ys = zip(*pts)
+    return np.interp(v, xs, ys).astype(np.float32)
+
+
 def under(pic, out, rng):
-    """The right wall: one flat warm tone where the lanterns reach, a darker step beyond, a hand-cut edge between.
-    The counter's front: its lit tone, a shelf line and the cloth."""
+    """The right wall: warm field ending two thirds up, edge in straight segments with a ragged awning cut.
+    The left wall: drawn shutter, downpipe, bracket, drain. The floor: a warm pool with smeared lanterns.
+    The counter's front, and the lantern paper with a bright centre."""
     k = pic.k
-    wall = right_wall(pic)
-    z, y = pic.pos[..., 2], pic.pos[..., 1]
-    wob = (pt.noise(pic.shape, (160 * k, 220 * k), rng) - 0.5) * 0.7
-    reach = np.hypot(y - G_AT[1], (z - G_AT[2]) * 0.8) + wob
+    x, y, z = pic.pos[..., 0], pic.pos[..., 1], pic.pos[..., 2]
+    ones = np.ones(pic.shape, np.float32)
     rows = np.arange(pic.shape[0], dtype=np.float32)[:, None]
-    fade = np.clip((rows - 80 * k) / (400 * k), 0, 1)  # the painter keeps the top of the picture dark
-    near, step = wall & (reach < 4.0), wall & (reach >= 4.0) & (reach < 7.5)
-    out = pt.mixa(out, pt.rgb(WARM_WALL), near * 0.8 * fade)
-    out = pt.mixa(out, pt.rgb(WARM_STEP), step * 0.6 * fade)
+    cols = np.arange(pic.shape[1], dtype=np.float32)[None, :]
+    wall = right_wall(pic)
+    wob = (pt.noise(pic.shape, (60 * k, 90 * k), rng) - 0.5) * 0.9
+    # half width of the lit field along the alley, by height: a few straight segments, then a ragged top
+    half = knots(z, ((0, 7.0), (3.0, 6.2), (6.5, 6.8), (10.0, 4.4), (14.0, 3.0), (16.5, 1.0)))
+    dy = np.abs(y - G_AT[1] - 1.2)
+    cut = np.where((z > 3.4) & (z < 4.6), 1.0, 0.0) * (np.abs(y - 12.0) < 1.6) * 0.0  # the awning's own shadow is the geometry
+    near = wall & (dy + wob < half * 0.62)
+    step = wall & (dy + wob < half) & ~near
+    fade = np.clip((rows - 160 * k) / (480 * k), 0, 1)
+    out = pt.mixa(out, pt.rgb(WARM_WALL), near * 0.6 * fade)
+    out = pt.mixa(out, pt.rgb(WARM_STEP), step * 0.45 * fade)
+    # the left wall: one flat dark tone, then the drawn things (nothing soft and round)
+    lw = left_wall(pic)
+    out = pt.mixa(out, pt.rgb(LEFT_WALL), lw * 0.85 * np.clip((rows - 60 * k) / (500 * k), 0, 1))
+    shutter = lw & (y > 8.6) & (y < 10.8) & (z > 0.0) & (z < 2.4)
+    slats = shutter & (np.mod(z, 0.16) < 0.06)
+    out = pt.mixa(out, pt.rgb(LEFT_DARK), shutter * 0.3)
+    out = pt.mixa(out, pt.rgb(LEFT_DARK), slats * 0.95)
+    out = pt.mixa(out, pt.rgb(an.LINE), pt.ink(slats, ones, k, rng, 0.8) * 0.8)
+    pipe = lw & (np.abs(y - 7.8) < 0.09)
+    brk = lw & (y > 11.2) & (y < 12.4) & (z > 2.2) & (z < 2.9)
+    brk_arm = lw & (y > 11.2) & (y < 12.4) & (np.abs(z - 2.9) < 0.05)
+    out = pt.mixa(out, pt.rgb(LEFT_DARK), (pipe | brk) * 0.9)
+    edges = (shutter != np.roll(shutter, 1, 1)) | (pipe != np.roll(pipe, 1, 1)) | (brk != np.roll(brk, 1, 0)) | (
+        brk != np.roll(brk, 1, 1)) | brk_arm
+    out = pt.mixa(out, pt.rgb(an.LINE), pt.ink(edges, ones, k, rng, 0.8) * 0.6)
+    drain = ground(pic) & (x < -2.0) & (x > -3.0) & (y > 4.0) & (y < 6.0)
+    out = pt.mixa(out, pt.rgb(an.LINE), pt.ink(drain != np.roll(drain, 1, 0), ones, k, rng, 0.8) * 0.6)
+    # the floor: darker near strip, then one warm pool under the counter with the lanterns smeared in it
+    gd = ground(pic)
+    near_strip = gd & (y < 6.0)
+    out = pt.mixa(out, pt.rgb(an.BG), near_strip * 0.4)
+    pw = (pt.noise(pic.shape, (50 * k, 80 * k), rng) - 0.5) * 0.7
+    pool = gd & (((x - 2.3 + pw) / 2.6) ** 2 + ((y - 11.0 + pw) / 2.4) ** 2 < 1)
+    out = pt.mixa(out, pt.rgb(POOL), pt.blur(pool.astype(np.float32), 5 * k) * 0.4)
+    r0 = pic.at((2.3, 13.6, 0.0))[0]
+    strip = np.floor(np.log1p(np.maximum(rows - r0, 0) / (14 * k)) * 6).astype(int)
+    gap = rng.random(64)[strip % 64] < 0.4
+    smear = np.zeros(pic.shape, np.float32)
+    for lx, col in ((1.45, ORANGE), (2.05, ORANGE), (2.65, RED), (3.25, ORANGE)):
+        c = pic.at((lx, 13.25, 0.0))[1]
+        m = (np.abs(cols - c) < 22 * k) * (rows > r0) * (1 - gap * 0.75) * np.clip(1 - (rows - r0) / (330 * k), 0, 1)
+        smear = np.maximum(smear, pt.blur(m.astype(np.float32), 1.6 * k))
+    out = pt.mixa(out, pt.rgb(tk.mix(ORANGE, PALE, 0.25)), (smear * gd * 0.4).astype(np.float32))
+    # the counter's front
     front = pic.solid & (np.abs(y - FRONT_Y) < 0.06) & (pic.n[..., 1] < -0.5) & an.inbox(
         pic.pos, (1.1, 13.4, -0.1), (3.9, 13.7, 1.05))
     out = np.where(front[..., None], pt.mixa(pt.rgb(COUNTER), pt.rgb(COUNTER_LIT), 0.5), out)
@@ -74,18 +132,21 @@ def under(pic, out, rng):
     cloth = front & (pic.pos[..., 0] > 1.85) & (pic.pos[..., 0] < 2.55) & (z > 0.22) & (z < 1.0)
     out = np.where(cloth[..., None], pt.rgb(CLOTH), out)
     edge = (cloth != np.roll(cloth, 1, 1)) | (shelf != np.roll(shelf, 1, 0))
-    return pt.mixa(out, pt.rgb(an.LINE), pt.ink(edge, np.ones(pic.shape, np.float32), k, rng, 0.8) * 0.7)
+    # lantern paper: bright centre, orange edge
+    for k_i, lx in enumerate((1.45, 2.05, 2.65, 3.25)):
+        paper = pic.solid & an.inbox(pic.pos, (lx - 0.18, 13.05, 2.08), (lx + 0.18, 13.45, 2.52)) & (pic.n[..., 1] < -0.2)
+        r = np.maximum(np.abs(x - lx) / 0.17, np.abs(z - 2.3) / 0.21)
+        w = np.clip(1.25 - r * 1.2, 0, 1)
+        base = RED if k_i == 2 else ORANGE
+        centre = tk.mix(base, PALE, 0.3 if k_i == 2 else 0.55)
+        col3 = pt.rgb(base) + (pt.rgb(centre) - pt.rgb(base)) * w[..., None]
+        out = np.where(paper[..., None], col3, out)
+    return pt.mixa(out, pt.rgb(an.LINE), pt.ink(edge, ones, k, rng, 0.8) * 0.7)
 
 
 def over(pic, out, rng):
-    """Steam off the kettle: one low wide puff, lighter toward the lanterns."""
-    k = pic.k
-    row, col = pic.at(KETTLE)
-    per_m = pic.f / KETTLE[1]
-    body, lit, inner = pt.puff(pic.shape, (row, col), 0.55 * per_m, 0.8 * per_m, rng)
-    soft = 0.8 * k
-    out = pt.mixa(out, pt.rgb(STEAM), pt.blur(body, soft) * 0.5)
-    return pt.mixa(out, pt.rgb(STEAM_LIT), pt.blur(body * lit, soft) * 0.4)
+    """Steam off the kettle: a thin veil, low and wide."""
+    return an.steam(pic, out, rng, (2.9, 13.9, 1.35), (0.5, 0.9), STEAM_LIT, opacity=0.4)
 
 
 LOOK = an.Look(
