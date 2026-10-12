@@ -23,6 +23,7 @@ traced from another work or made by an image-generation model. No third-party te
 | scene F, Tunnel mouth, painted full size (candidate, not yet shipped, written to `.cache/anime/f.png`) | `tools/anime_f.py` with `tools/bg_f_tunnel_mouth.py` and the painter `tools/anime.py` | 15 | 16 (data renders) | original code-made art: a wet road bending into a lit tunnel under a stepped retaining wall, painted in numpy; no image, brush or font is loaded |
 | scene B, Moored lantern, painted full size (candidate, not yet shipped, written to `.cache/anime/b.png`) | `tools/anime_b.py` with `tools/bg_b_moored_lantern.py` and the painter `tools/anime.py` | 11 | 16 (data renders) | original code-made art: a paper lantern moored to a wet roof, low cloud among far towers, and a vent and a cable on the near parapet, painted in numpy; no image, brush or font is loaded |
 | the animated rough sheet (not shipped) | `tools/anime_sheet.sh` | | | the images above as labelled tiles |
+| the final sheet (not shipped) | `tools/anime_final_sheet.sh` | | | the eight painted backgrounds as labelled tiles under the theme's name |
 
 ## Technique
 
@@ -72,4 +73,4 @@ be openly licensed and is listed here with its licence.
 
 | Font | Used for | Path | Licence |
 |---|---|---|---|
-| Liberation Sans Regular | tile labels on the rough sheet only, which is not shipped | `/usr/share/fonts/liberation/LiberationSans-Regular.ttf` | SIL OFL 1.1, `/usr/share/licenses/ttf-liberation/LICENSE` |
+| Liberation Sans Regular | tile labels and the title on the review sheets only, which are not shipped | `/usr/share/fonts/liberation/LiberationSans-Regular.ttf` | SIL OFL 1.1, `/usr/share/licenses/ttf-liberation/LICENSE` |

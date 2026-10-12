@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The final sheet for review: the eight painted backgrounds at full size as labelled tiles 860 wide on one sheet.
+# The final sheet of the Last Train theme for review: the eight painted backgrounds at full size as labelled tiles 860 wide on one sheet.
 #   tools/anime_final_sheet.sh <src-dir> <sheet.png>
 # <src-dir> holds a.png to g.png and 06.png at 3440x1440, each painted by its own script:
 #   uv run tools/anime_<a to g>.py   and   uv run tools/anime_roughs.py --scene 06 --percent 100
@@ -24,6 +24,7 @@ tile e.png "E  Last train" 5
 tile f.png "F  Tunnel mouth" 6
 tile g.png "G  The counter" 7
 tile 06.png "06  Omarchy over the city" 8
-magick montage "$tmp"/[1-8].png -tile 2x4 -geometry +6+6 -background "$paper" "$sheet"
+magick montage "$tmp"/[1-8].png -tile 2x4 -geometry +6+6 -background "$paper" -font "$font" -pointsize 30 \
+  -fill "$ink" -title "Last Train" "$sheet"
 rm -r "$tmp"
 echo "wrote $sheet"
