@@ -21,6 +21,7 @@ NAME = "e-last-train"
 SEED = SEEDS["E"]
 SAMPLES = 160
 VY, VZ = 90.0, 6.55   # the viaduct: its distance and deck height
+SHIFT = -6.0          # the train sits this far left of where the rough had it, metres
 
 
 def build(rng):
@@ -48,18 +49,17 @@ def build(rng):
     car = city.plain("car", tk.mix(P["background"], P["muted"], 0.35), roughness=0.35, metallic=0.5)
     T, G, L = city.Boxes(), city.Boxes(), city.Boxes()
     for k in range(3):
-        x0 = -20.5 + k * 17.0
+        x0 = -20.5 + SHIFT + k * 17.0
         T.box((x0, vy - 1.45, vz + 0.4), (x0 + 16.4, vy + 1.45, vz + 3.7))
         for j in range(9):
             wx = x0 + 0.9 + j * 1.68
             G.box((wx, vy - 1.47, vz + 1.75), (wx + 1.25, vy - 1.45, vz + 2.75))
-    L.box((-20.52, vy - 1.2, vz + 0.9), (-20.5, vy - 0.8, vz + 1.2))
-    L.box((-20.3, vy - 1.47, vz + 0.9), (-19.9, vy - 1.45, vz + 1.2))
+    L.box((-20.52 + SHIFT, vy - 1.2, vz + 0.9), (-20.5 + SHIFT, vy - 0.8, vz + 1.2))
+    L.box((-20.3 + SHIFT, vy - 1.47, vz + 0.9), (-19.9 + SHIFT, vy - 1.45, vz + 1.2))
     T.done("train", car)
     G.done("train_windows", tk.emissive("train_windows", srgb(WIN_WARM), 10.0))
     L.done("tail_lamp", tk.emissive("tail_lamp", srgb(RED), 18.0))
-    city.mist("train_mist", (5, vy - 6, vz + 2.2), 34.0, 0.014, MIST, squash=(1.0, 0.5, 0.45), glow=ORANGE,
-              glow_strength=0.03)
+    # no mist volume here: its edge showed as a hard dome against the far city; the painter's body field is the air
     # towers on both banks, behind the ends of the viaduct
     near = city.facade("near", BODY, GLASS, WIN_A, WIN_B, WIN_WARM, bay=3.0, floor_h=3.6, lit=0.05, strength=0.9,
                        ground=5.0)
@@ -67,7 +67,11 @@ def build(rng):
     for x0, x1, y0, h in ((-50, -38, 100, 21), (-40, -31, 104, 27), (32, 43, 108, 26), (42, 54, 112, 19)):
         B.box((x0, y0, -3), (x1, y0 + 18, h))
     B.done("towers", near)
-    far(rng, near=200, heights=(16, 40), spread=50, top=80.0, start=170, glow_strength=0.016, tall=0.0)
+    # the far city in two rows: a middle row and a far one, each its own mass
+    mat = city.facade("far", __import__("roughs").BODY_FAR, GLASS, WIN_A, WIN_B, WIN_WARM, bay=3.5, floor_h=4.0, lit=0.08,
+                      strength=0.9, warm_part=0.2, ground=6.0)
+    for near_, far_, count, heights in ((190, 330, 130, (18, 36)), (440, 850, 220, (34, 74))):
+        city.skyline(rng, mat, None, count, near_, far_, 36, heights, tall=0.0)
     tk.set_world(srgb(SKY), 0.1)
     look(eye, 28, 850)
 

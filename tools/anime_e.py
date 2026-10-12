@@ -29,9 +29,10 @@ import bg_e_last_train as e  # noqa: E402
 P = tk.palette()
 RED, ORANGE, PALE = P["accent"], P["orange"], P["foreground"]
 WIN_GLASS = tk.mix(an.SEL, P["blue"], 0.1)  # a step lighter than the wall it is in
-WIN_COOL = tk.mix(an.SEL, P["bright_blue"], 0.4)
+WIN_COOL = tk.mix(an.SEL, P["bright_blue"], 0.2)
 WIN_EDGE = tk.mix(an.SEL, P["blue"], 0.3)
-WIN_WARM = tk.mix(ORANGE, PALE, 0.3)
+WIN_WARM = tk.mix(tk.mix(ORANGE, PALE, 0.3), an.SEL, 0.5)  # dimmer than the train's dimmest window
+QUAY = tk.mix(tk.mix(an.BG, an.SEL, 0.3), P["blue"], 0.15)
 BOLLARD_LIT = tk.mix(tk.mix(an.BG, an.SEL, 0.45), ORANGE, 0.18)
 
 rg.BODY, rg.GLASS, rg.ROAD, rg.DECK, rg.STEEL = an.BODY, an.GLASS, an.ROAD, an.PAVE, an.STEEL
@@ -58,10 +59,9 @@ def water(pic):
 def dress(pic, rng):
     """Windows on the four near towers, drawn; marks on the far city."""
     upright = an.walls(pic)[0]
-    wall = upright & ~pic.far & (pic.pos[..., 1] > 95)
-    an.windows(pic, rng, wall, bay=3.3, floor_h=3.6, ground=2.0, part=0.5, warm=0.1, glass=WIN_GLASS, edge=WIN_COOL,
+    wall = upright & ~pic.far & (pic.pos[..., 1] > 95) & (pic.pos[..., 1] < 135)
+    an.windows(pic, rng, wall, bay=3.3, floor_h=3.6, ground=2.0, part=0.17, warm=0.55, glass=WIN_GLASS, edge=WIN_EDGE,
                lit=WIN_WARM)
-    an.marks(pic, rng, upright & pic.far, cool=WIN_COOL, lit=WIN_WARM)
 
 
 def under(pic, out, rng):
@@ -80,10 +80,22 @@ def under(pic, out, rng):
     col_id = np.searchsorted(edges, cols[0])[None, :]
     keep = rng.random(512)[col_id % 512] > 0.4
     near = np.clip(1 - np.abs(rows - r0) / (150 * k), 0, 1) * (1 - gap) * keep
-    x0, x1 = pic.at((-21.0, VY, 0))[1], pic.at((31.0, VY, 0))[1]
+    x0, x1 = pic.at((-21.0 + e.SHIFT, VY, 0))[1], pic.at((31.0 + e.SHIFT, VY, 0))[1]
     inside = ((cols > x0) & (cols < x1)).astype(np.float32)
     smear = (near * inside).astype(np.float32)
     out = pt.mixa(out, pt.rgb(tk.mix(ORANGE, PALE, 0.25)), smear * wet * 0.34)
+    # the far city: darker at the water line, rising to a lighter band at the towers' feet
+    z = pic.pos[..., 2]
+    farwall = pic.solid & pic.far & ~pic.flat
+    out = pt.mixa(out, pt.rgb(an.BG), farwall * np.clip(0.5 - z / 120.0, 0.2, 0.5))
+    # the pier faces nearest the train take its warmth
+    x = pic.pos[..., 0]
+    pier = pic.solid & ~pic.far & (np.abs(pic.pos[..., 1] - VY) < 3.5) & (pic.pos[..., 2] < VZ) & (pic.n[..., 1] < -0.5)
+    near_t = np.clip(1 - np.maximum(np.abs(x - (5.0 + e.SHIFT)) - 26.0, 0) / 14.0, 0, 1)
+    out = pt.mixa(out, pt.rgb(tk.mix(an.SEL, ORANGE, 0.3)), (pier * near_t * 0.6).astype(np.float32))
+    # the near quay a step darker and bluer
+    quay = pic.solid & (pic.dist < 40) & (pic.n[..., 2] > 0.5) & ~wet
+    out = pt.mixa(out, pt.rgb(QUAY), quay * 0.7)
     # the bollard
     bol = pic.solid & an.inbox(pic.pos, *BOLLARD)
     lit = bol & (pic.n[..., 0] > 0.2)
@@ -93,15 +105,15 @@ def under(pic, out, rng):
 
 
 LOOK = an.Look(
-    name="e", seed=e.SEED, build=build, key_at=(5.0, VY - 5.0, VZ + 2.4), key_colour=ORANGE,
-    rings=(14.0, 24.0, 34.0), amounts=(0.3, 0.15, 0.06),
-    glows=(an.Glow(an.within((-21.0, VY - 2.0, VZ + 1.6), (31.0, VY - 1.0, VZ + 2.9)), halo=((12, 0.9), (70, 1.3)),
+    name="e", seed=e.SEED, build=build, key_at=(5.0 + e.SHIFT, VY - 5.0, VZ + 2.4), key_colour=ORANGE,
+    rings=(36.0, 70.0, 120.0), amounts=(0.12, 0.0, 0.0),
+    glows=(an.Glow(an.within((-21.0 + e.SHIFT, VY - 2.0, VZ + 1.6), (31.0 + e.SHIFT, VY - 1.0, VZ + 2.9)), halo=((12, 0.9), (70, 1.3)),
                    smear=1.6, colour=ORANGE),
-           an.Glow(an.within((-20.7, VY - 2.0, VZ + 0.8), (-19.8, VY - 0.7, VZ + 1.3)), halo=((7, 3.0),), colour=RED,
+           an.Glow(an.within((-20.7 + e.SHIFT, VY - 2.0, VZ + 0.8), (-19.8 + e.SHIFT, VY - 0.7, VZ + 1.3)), halo=((7, 3.0),), colour=RED,
                    smear=1.0)),
-    tier_at=(190.0, 380.0, 600.0), veil=((150.0, 0.3),), wet=water, tint=0.3,
-    dress=dress, under=under, wobble=1.4, hesitate=True, cut=3.0, ring_bands=0.6, body=(18.0, 0.18),
-    shade_wobble=3.0, air=((130, 0.2), (70, 0.4), (30, 0.58)))
+    tier_at=(190.0, 340.0, 560.0), wet=water, tint=0.05,
+    dress=dress, under=under, wobble=1.4, hesitate=True, cut=3.0, ring_bands=0.15, body=(22.0, 0.22),
+    shade_wobble=3.0)
 
 
 if __name__ == "__main__":
