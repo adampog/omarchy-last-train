@@ -42,6 +42,7 @@ WALL_FAR = tk.mix(tk.mix(an.BG, an.SEL, 0.4), P["blue"], 0.12)  # the far wall, 
 INNER_A = tk.mix(tk.mix(an.BG, an.SEL, 0.4), ORANGE, 0.22)      # the tunnel's inner walls, lit
 INNER_B = tk.mix(tk.mix(an.BG, an.SEL, 0.25), ORANGE, 0.08)     # and the shadow step
 FAR_END = tk.mix(tk.mix(ORANGE, PALE, 0.3), WARM, 0.3)
+PATCH = tk.mix(tk.mix(tk.mix(an.BG, an.SEL, 0.4), P["blue"], 0.1), ORANGE, 0.16)
 POOL = tk.mix(tk.mix(an.BG, an.SEL, 0.35), ORANGE, 0.32)
 HOUSING = tk.mix(an.BG, an.SEL, 0.18)
 
@@ -144,6 +145,10 @@ def under(pic, out, rng):
     out = np.where(br[..., None], pt.rgb(HOUSING), out)
     edges = (house != np.roll(house, 1, 1)) | (br != np.roll(br, 1, 1)) | (br != np.roll(br, 1, 0))
     out = pt.mixa(out, pt.rgb(an.LINE), pt.ink(edges, ones, k, rng, 0.8) * 0.7)
+    # the wall's warm glow over the mouth: one flat low wide patch, edged in a few straight hand-cut segments
+    ytop = np.interp(x, (-21, -15, -10, -5, 1), (8.0, 9.0, 9.6, 9.0, 8.1))
+    patch = front & (z > 7.85) & (z < ytop) & (x > -21) & (x < 1)
+    out = pt.mixa(out, pt.rgb(PATCH), patch * 0.4 * np.clip((rows - 150 * k) / (200 * k), 0, 1))
     # the mouth's far end: a soft warm gradient, brightest low and in the middle, not a flat field
     (t0, l0), (b0, r0) = pic.at((-15.4, 46.0, 7.0)), pic.at((-5.4, 46.0, 0.0))
     mouth = (rows > t0) & (rows < b0) & (cols > l0) & (cols < r0) & (pic.dist > 150)
@@ -165,22 +170,31 @@ def under(pic, out, rng):
     # the mouth's light on the wet road: vertical smears cut by bands of plain dark road
     wet = road(pic)
     r0r = pic.at((-10.4, 46.0, 0.0))[0]
-    strip = np.floor(np.log1p(np.maximum(rows - r0r, 0) / (16 * k)) * 6).astype(int)
-    gap = rng.random(64)[strip % 64] < 0.4
-    edges_c = np.cumsum(rng.uniform(5, 18, 600)) * k
+    strip = np.floor(np.log1p(np.maximum(rows - r0r, 0) / (16 * k)) * 5).astype(int)
+    sid = strip % 64
+    gap = rng.random(64)[sid] < 0.4
+    # broken horizontal smears: each band of the road has its own run of lit stretches
+    edges_c = np.cumsum(rng.uniform(30, 140, 600)) * k
     col_id = np.searchsorted(edges_c, cols[0])[None, :]
-    keep = rng.random(512)[col_id % 512] > 0.5
+    keep = rng.random((64, 600))[sid, col_id % 600] > 0.45
     reach = np.clip(1 - np.abs(cols - cx) / (520 * k), 0, 1) ** 0.7 * np.clip(1 - (rows - r0r) / (700 * k), 0, 1)
     smear = (np.clip(rows - r0r, 0, None) > 0) * (1 - gap * 0.7) * keep * reach
     smear = pt.blur(smear.astype(np.float32), 1.6 * k)
+    # the lip lamps' red: two short smears
+    red = np.zeros(pic.shape, np.float32)
+    for lx in (-13.8, -7.0):
+        c = pic.at((lx, 45.4, 0.0))[1]
+        m = (np.abs(cols - c - rng.uniform(-6, 6) * k) < 14 * k) * (rows > r0r) * np.clip(1.2 - (rows - r0r) / (140 * k), 0, 1) * (1 - gap * 0.8)
+        red = np.maximum(red, m.astype(np.float32))
+    out = pt.mixa(out, pt.rgb(RED), (pt.blur(red, 1.4 * k) * wet * 0.5).astype(np.float32))
     # the rest of the road a step darker, the bottom strip darkest; one flat warm pool under the mouth
-    dark = np.clip(0.25 + (rows - r0r) / (rows.max() - r0r + 1) * 0.4, 0, 0.65)
+    dark = np.clip(0.1 + (rows - r0r) / (rows.max() - r0r + 1) * 0.4, 0, 0.5)
     out = pt.mixa(out, pt.rgb(an.BG), ((wet | (pic.solid & (pic.n[..., 2] > 0.7) & (z < 0.3))) * dark).astype(np.float32))
     pw = (pt.noise(pic.shape, (40 * k, 120 * k), rng) - 0.5) * 60 * k
     pool = wet & (np.abs(cols - cx + pw) < (r0 - l0) * 0.75) & (rows < r0r + 300 * k + pw)
     out = pt.mixa(out, pt.rgb(POOL), pt.blur(pool.astype(np.float32), 5 * k) * 0.45)
     out = pt.mixa(out, pt.rgb(tk.mix(ORANGE, PALE, 0.2)), (smear * wet * 0.4).astype(np.float32))
-    out = pt.mixa(out, pt.rgb(an.BG), (front * (1 - np.clip((cols - 0) * 0, 0, 1)) * 0.18).astype(np.float32))
+    out = pt.mixa(out, pt.rgb(an.BG), (front * 0.0).astype(np.float32))
     # two depth tones in the towers: the nearer ones a step darker
     tower = pic.solid & (z > 14.1) & ~pic.flat
     out = pt.mixa(out, pt.rgb(an.BG), (tower & (pic.dist < 400)) * 0.22)
@@ -188,7 +202,7 @@ def under(pic, out, rng):
 
 
 LOOK = an.Look(
-    name="f", seed=f.SEED, build=build, key_at=(-10.4, 49.0, 5.0), key_colour=ORANGE,
+    name="f", seed=f.SEED, build=build, key_at=(-10.4, 56.0, 4.5), key_colour=ORANGE,
     rings=(13.0, 28.0, 52.0), amounts=(0.42, 0.25, 0.1),
     glows=(an.Glow(an.within((-14.0, 50.0, 6.8), (-7.0, 201.0, 7.1)), "tube", halo=((24, 1.0), (110, 2.2)), smear=1.5,
                    colour=ORANGE),

@@ -28,6 +28,8 @@ def build(rng):
     road = city.wet_road("road", ROAD, puddle=0.52, size=1.0, rough=0.2)
     G = city.Boxes()
     G.box((-400, -60, -1), (400, 46, 0))
+    G.box((-400, 46, -1), (-15.4, 300, 0))   # the ground runs on to the far wall, so no sky shows at its foot
+    G.box((-5.4, 46, -1), (400, 300, 0))
     G.box((-15.4, 46, -1), (-5.4, 220, 0))  # the road on into the tunnel
     G.done("ground", road)
     wall = city.plain("wall", tk.mix(P["background"], P["muted"], 0.2), roughness=0.7)
