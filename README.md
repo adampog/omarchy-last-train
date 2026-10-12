@@ -41,6 +41,7 @@ module at 5.2.2 on Python 3.13.
 ```bash
 uv sync
 uv run tools/bg6_wordmark.py
+uv run tools/bg_a_rain_gate.py
 ```
 
 Each script writes its image into `backgrounds/`. Seeds are fixed, so a re-render matches the committed image

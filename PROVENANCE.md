@@ -10,8 +10,11 @@ traced from another work or made by an image-generation model. No third-party te
 |---|---|---|---|---|
 | `colors.toml`, `neovim.lua`, `btop.theme`, `chromium.theme`, `icons.theme` | written by hand | | | the theme palette and configuration |
 | `backgrounds/06-neo-tokyo-omarchy-skyline.png` | `tools/bg6_wordmark.py` | 1 | 64 | original code-made art: the Omarchy wordmark extruded, over a city of procedural boxes |
+| `backgrounds/a-rain-gate.png` | `tools/bg_a_rain_gate.py` | 7 | 160 | original code-made art: a wet street of procedural boxes under a sign stack of plain frames, bars and a ring, with no lettering |
+| roughs of scenes B to G (860x360, not shipped, written to `.cache/roughs/`) | `tools/roughs.py` | 11 to 16 | 64 | original code-made art: a lantern sphere on a roof, a parked trail bike of boxes and tubes, a mast and tank, a box-car train on a viaduct, a tunnel mouth, an alley counter |
+| the rough sheet (not shipped) | `tools/rough_sheet.sh` | | | the images above as labelled tiles |
 
-Each new image gets a row here in the commit that adds it.
+Each new image gets a row here in the commit that adds it. Final file names are given when the set is chosen.
 
 ## Colours
 
@@ -34,10 +37,16 @@ as Omarchy's stock themes use it, and no copy of the SVG is kept in this reposit
 | ImageMagick | resizing, previews and checks | ImageMagick License |
 
 The scripts are this repository's own code under its MIT licence, including the shared helpers in
-`tools/scenes.py`, which load no images. `pyproject.toml` and `uv.lock` pin the Python packages; `bpy` brings
+`tools/scenes.py` and the city kit in `tools/city.py` (building faces, wet road, tubes, mist, haze, steam), which
+load no images. `pyproject.toml` and `uv.lock` pin the Python packages; `bpy` brings
 numpy, requests, cattrs, cython and zstandard with it, each under its own open licence. Blender's licence covers
 the program, not the images made with it.
 
 ## Fonts
 
-None yet. Any font added later must be openly licensed and is listed here with its licence.
+No image in `backgrounds/` contains lettering or uses a font. Any font added later must be openly licensed and
+is listed here with its licence.
+
+| Font | Used for | Path | Licence |
+|---|---|---|---|
+| Liberation Sans Regular | tile labels on the rough sheet only, which is not shipped | `/usr/share/fonts/liberation/LiberationSans-Regular.ttf` | SIL OFL 1.1, `/usr/share/licenses/ttf-liberation/LICENSE` |
