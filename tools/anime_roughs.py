@@ -20,6 +20,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import scenes as tk  # noqa: E402
+import city  # noqa: E402
 import paint as pt  # noqa: E402
 import anime as an  # noqa: E402
 import roughs as rg  # noqa: E402
@@ -210,6 +211,17 @@ LOOK_G = Look(
 
 # ---------- 06, the Omarchy wordmark over the city ----------
 
+LIT_TO = 0.2                                   # how far up a letter's face the city's light reaches, of its height
+CITY_HAZE = tk.mix(tk.mix(ORANGE, P["brown"], 0.45), an.SEL, 0.25)  # the city's light in the air
+CITY_BAND = tk.mix(ORANGE, an.SEL, 0.3)                            # a lit band low on a tower's face
+HAZE_BANDS = ((1700.0, 0.05), (2600.0, 0.16), (4200.0, 0.3), (6200.0, 0.46))  # beyond this far, this much haze
+BANDS = ((176.0, 185.0), (146.0, 152.0), (107.0, 113.0))  # each one's lit band, the lowest part of it in the frame
+# the nearest tall block at the bottom left and its two neighbours, as the city script places them with seed 1
+BLOCKS = (((-436.7, 862.1, 0.0), (-381.8, 913.8, 254.7)),
+          ((-528.6, 930.4, 0.0), (-477.0, 968.4, 170.9)),
+          ((-429.7, 1168.3, 0.0), (-382.8, 1195.1, 126.4)))
+
+
 def w_under(pic, out, rng):
     """The ground between the towers as stepped blues, and the letters flat in two tones: a cool field where
     the city's light reaches up them, a dark tone above, with their undersides pale and their left sides red."""
@@ -220,18 +232,32 @@ def w_under(pic, out, rng):
     for at, colour in zip(pic.look.tier_at[1:], an.TIERS[1:]):
         ground = np.where((away > at)[..., None], pt.rgb(colour), ground)
     out = np.where((~pic.solid & (rows > pic.horizon))[..., None], pt.mixa(ground, pt.rgb(an.SHADE), 0.3), out)
-    word = pic.solid & (pic.dist < 550)
+    # past the last towers the ground is lost in the air: it takes the sky's own colour where the two meet
+    lost = ~pic.solid & (rows > pic.horizon) & (away > HAZE_BANDS[-1][0])
+    out = np.where(lost[..., None], out[max(int(pic.horizon) - 1, 0)][None], out)
+    word =pic.solid & (pic.dist < 550)
+    # the nearest tall block and its two neighbours: one lit band low on their faces
+    for (lo, hi), (z0, z1), amount in zip(BLOCKS, BANDS, (0.5, 0.25, 0.25)):
+        band = pic.solid & an.inbox(pic.pos, (lo[0] - 1, lo[1] - 1, z0), (hi[0] + 1, hi[1] + 1, z1)) \
+            & (np.abs(pic.n[..., 2]) < 0.5)
+        out = pt.mixa(out, pt.rgb(CITY_BAND), band * amount)
+    # the city's own light in the air: a warm band lying on the horizon. The far city sinks into it in depth
+    # bands, and it fades up into the blue of the sky.
+    far = np.where(pic.solid, pic.dist, away)
+    haze = np.zeros(pic.shape, np.float32)
+    edge = 1 + 0.25 * (pt.noise(pic.shape, (30 * k, 500 * k), rng) - 0.5)
+    for beyond, amount in HAZE_BANDS:
+        haze = np.where(far * edge > beyond, amount, haze)
+    haze = pt.blur(haze, 3 * k)
+    up = HAZE_BANDS[-1][1] * np.exp(-np.maximum(pic.horizon - rows, 0) / (95 * k))
+    haze = np.where(rows < pic.horizon, np.broadcast_to(up, pic.shape), haze)
+    haze = np.clip(haze + 0.16 * np.exp(-np.abs(rows - pic.horizon) / (70 * k)), 0, 1) * ~word  # no line where they meet
+    out = pt.mixa(out, pt.rgb(CITY_HAZE), haze)
     z = pic.pos[..., 2]
     lo, hi = z[word].min(), z[word].max()
-    # one straight shadow line on each letter, the same on all of them: the city's light from below reaches a
-    # little way up the face and its edge rises across the letter. Letters are told apart by the gaps between them.
-    cols = word.any(0)
-    starts = np.flatnonzero(cols & ~np.roll(cols, 1))
-    ends = np.flatnonzero(cols & ~np.roll(cols, -1))
-    across = np.zeros(pic.shape[1], np.float32)
-    for s, e in zip(starts, ends):
-        across[s:e + 1] = np.linspace(0, 1, e - s + 1)
-    lit = (z - lo) / (hi - lo) < (0.13 + 0.14 * across)[None, :]
+    # one level shadow line at the same height on every letter: the city's light from below reaches a little
+    # way up the face
+    lit = (z - lo) / (hi - lo) < LIT_TO
     cool = pt.rgb(tk.mix(tk.mix(w6.UPLIGHT, w6.LETTER, 0.3), an.SEL, 0.3))
     dark = pt.rgb(tk.mix(tk.mix(w6.LETTER, an.SEL, 0.5), an.BG, 0.45))
     tone = np.where(lit[..., None], cool, dark)
@@ -255,14 +281,30 @@ def w_build(rng):
         w6.build()
     finally:
         w6.city_material = material
+    # the nearest tall block gets a stepped top, a roof tank and a mast; its neighbours a smaller step each
+    T = city.Boxes()
+    (x0, y0, _), (x1, y1, h) = BLOCKS[0]
+    T.box((x0 + 9, y0 + 8, h), (x1 - 14, y1 - 8, h + 16))
+    T.box((x0 + 14, y0 + 12, h + 16), (x1 - 26, y1 - 14, h + 24))
+    T.box((x1 - 11, y0 + 5, h), (x1 - 3, y0 + 13, h + 7))        # the tank
+    T.box((x0 + 17, y0 + 16, h + 24), (x0 + 18.4, y0 + 17.4, h + 60))  # the mast
+    for (x0, y0, _), (x1, y1, h) in BLOCKS[1:]:
+        T.box((x0 + 6, y0 + 6, h), (x1 - 10, y1 - 6, h + 8))
+        T.box((x1 - 8, y0 + 4, h), (x1 - 3, y0 + 9, h + 4))
+    T.done("city_tops", city.plain("city_tops", w6.CITY_BODY))
 
 
 def w_dress(pic, rng):
-    """Windows on the towers as loose clusters of small marks, larger and warmer on the nearest blocks."""
+    """Windows on the towers as loose clusters of marks: few, large and warm on the nearest blocks, small on
+    the middle distance, none on the far carpet."""
     upright = an.walls(pic)[0] & pic.far
-    near = upright & (pic.dist < 1500)
-    an.marks(pic, rng, near, bay=6.0, floor_h=4.2, ground=4.0, part=0.6, warm=0.3, cool=w6.CITY_WIN, lit=w6.CITY_WARM)
-    an.marks(pic, rng, upright & ~near, bay=10.0, floor_h=5.5, ground=4.0, part=0.75, warm=0.28, cool=w6.CITY_WIN,
+    front = upright & (pic.dist < 1150)
+    near = upright & ~front & (pic.dist < 1700)
+    rest = upright & ~front & ~near & (pic.dist < HAZE_BANDS[1][0])
+    an.marks(pic, rng, front, bay=11.0, floor_h=8.0, ground=6.0, part=0.5, warm=0.55, cool=w6.CITY_WIN,
+             lit=w6.CITY_WARM)
+    an.marks(pic, rng, near, bay=7.0, floor_h=5.0, ground=4.0, part=0.6, warm=0.4, cool=w6.CITY_WIN, lit=w6.CITY_WARM)
+    an.marks(pic, rng, rest, bay=10.0, floor_h=5.5, ground=4.0, part=0.75, warm=0.28, cool=w6.CITY_WIN,
              lit=w6.CITY_WARM)
 
 
@@ -271,7 +313,7 @@ LOOK_06 = Look(
     amounts=(0.0, 0.0, 0.0), glows=(Glow(red_lamps, halo=((7, 2.5),), colour=RED),),
     tier_at=(560.0, 2600.0, 5200.0), veil=(), under=w_under, far_dim=0.15, dress=w_dress,
     air=((60.0, 0.1), (30.0, 0.2), (12.0, 0.3)),
-    sky=(an.SKY_TOP, tk.mix(an.BG, an.SEL, 0.42), tk.mix(an.SEL, an.BLUE, 0.2)), window_lines=0.0, offset=20000.0)
+    sky=(an.SKY_TOP, tk.mix(an.BG, an.SEL, 0.34), tk.mix(an.SEL, an.BLUE, 0.08)), window_lines=0.0, offset=20000.0)
 
 
 LOOKS = {"B": LOOK_B, "C": LOOK_C, "D": LOOK_D, "E": LOOK_E, "F": LOOK_F, "G": LOOK_G, "06": LOOK_06}

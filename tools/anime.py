@@ -103,6 +103,7 @@ class Look:
     strokes: float = 0.0          # how far the smears on wet ground break into separate brush strokes
     unshaded: object = None       # unshaded(pic) gives where the key's cast shadow is left out: a mask
     no_ink: object = None         # no_ink(pic) gives how much of the pen line is taken off, 0 to 1 per pixel
+    rain_thin: object = None      # rain_thin(pic) gives how much of the rain is taken off, 0 to 1 per pixel
     offset: float = 1000.0        # added to positions so the data render holds no negative numbers
     extra: dict = field(default_factory=dict)
 
@@ -515,6 +516,8 @@ def rain(pic, out, rng):
     r *= 1 - np.clip(pt.blur(tubes, 22 * k) * 12, 0, 1)  # the streaks stop at a tube and its tight halo
     if pic.look.rain_far:
         r *= np.where(pic.dist > pic.look.rain_far, 0.6, 1.0)
+    if pic.look.rain_thin:
+        r = r * (1 - np.clip(pic.look.rain_thin(pic), 0, 1))
     return pt.mixa(out, pt.rgb(pic.look.rain_colour), np.clip(r * 1.2, 0, 0.5))
 
 
@@ -526,7 +529,7 @@ def finish(pic, out, rng, amount=0.014):
     return pt.grain(out, amount, rng)
 
 
-def steam(pic, out, rng, at, size, lit, toward=-1, opacity=0.45, lift=0.45, notch=0.6, trail=0.9, lobes=3):
+def steam(pic, out, rng, at, size, lit, toward=-1, opacity=0.45, lift=0.45, notch=0.4, trail=0.9, lobes=3):
     """Steam as a veil, for a scene's `over`: a low ragged shape rising at `at` and trailing along the ground away
     from the light, thin enough that what is behind shows through. Its tone is the ground's own, lifted a little;
     only the rim toward the light is bright, in the colour `lit`. `size` is one lobe's half width and its height
@@ -537,7 +540,7 @@ def steam(pic, out, rng, at, size, lit, toward=-1, opacity=0.45, lift=0.45, notc
     per_m = pic.f / reach
     behind = pic.dist > reach - 0.5
     body, rim, _ = pt.puff(pic.shape, (row, col), size[0] * per_m, size[1] * per_m, rng, lobes=lobes, toward=toward,
-                           notch=notch, trail=trail, points=15)
+                           notch=notch, trail=trail, points=10)
     ground = pt.blur(out, 30 * k)  # the tone of what it lies over
     tone = pt.mixa(ground, pt.rgb(STEAM), lift)
     shape = pt.blur((body > 0).astype(np.float32), 0.8 * k)  # the cut edge stays; only the rim's inner side is soft

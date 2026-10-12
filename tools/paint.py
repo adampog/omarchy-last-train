@@ -277,9 +277,18 @@ def puff(shape, at, width, height, rng, lobes=3, toward=-1, points=11, notch=0.0
         if notch:
             for at_point in rng.choice(points, int(rng.integers(2, 4)), replace=False):
                 cut[at_point] *= 1 - notch
-        turn = (np.arctan2(yy - cy, xx - cx) / (2 * np.pi) + 0.5) * points
+        turn = (np.arctan2((yy - cy) / ry, (xx - cx) / rx) / (2 * np.pi) + 0.5) * points
         j = turn.astype(int) % points
-        edge = cut[j] + (cut[(j + 1) % points] - cut[j]) * (turn - np.floor(turn))
+        if notch:  # cut with scissors: straight cuts from point to point, and one lobe in two torn open
+            cut = 0.9 + (cut - 0.95) * 0.5  # no spikes: the cuts stay near the lobe's own outline
+            if i % 2 == 0:
+                cut[int(rng.integers(points))] *= 0.5
+            step = 2 * np.pi / points
+            part = (turn - np.floor(turn)) * step
+            ra, rb = cut[j], cut[(j + 1) % points]
+            edge = ra * rb * np.sin(step) / (ra * np.sin(part) + rb * np.sin(step - part))
+        else:
+            edge = cut[j] + (cut[(j + 1) % points] - cut[j]) * (turn - np.floor(turn))
         reach = np.hypot((xx - cx) / rx, (yy - cy) / ry) / edge
         body |= reach < 1
     d = max(2, int(width * 0.2))
