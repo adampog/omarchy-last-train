@@ -23,7 +23,8 @@ traced from another work or made by an image-generation model. No third-party te
 The backgrounds are painted, not rendered as pictures. Blender renders each scene five times as plain data
 (local colour, emission, position, surface direction and a hard shadow mask from the one key light), and
 `tools/anime.py` paints the picture from that data in numpy: a gradient sky, stepped far-city silhouettes, one
-flat local colour and one flat shadow tone per surface, pen lines on edges, drawn lamps and halos, smears on wet
+flat local colour and one flat shadow tone per surface, windows drawn unevenly on the walls, pen lines on edges
+that wander a pixel or two and hesitate at corners, drawn lamps and halos, smears on wet
 ground, rain streaks, uneven pigment in the colour fields, a darker top edge and one even grain. All of it comes
 from seeded noise and the colours in `colors.toml`.
 

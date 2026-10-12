@@ -3,7 +3,8 @@
 The renderer writes five data images and no lighting: each surface's flat local colour, what glows, where each
 pixel is in the world, which way it faces, and a hard shadow mask of the one key light. Everything seen is then
 painted here: flat tones, pen lines, a gradient sky, a stepped far city, drawn lamps and halos, smears on wet
-ground, rain, one even grain. A scene describes itself with a `Look` and may add its own drawn things in hooks.
+ground, rain, one even grain. Near edges are pulled a pixel or two off the ruler and lines hesitate at corners;
+windows are drawn on the walls here, uneven, not taken from a computed grid. A scene describes itself with a `Look` and may add its own drawn things in hooks.
 
 The painter darkens the top 480 px of every picture, to 30% at the top edge: a painter's vignette, which also
 keeps the strip under the desktop bar quiet.
@@ -40,6 +41,7 @@ SHADE = tk.mix(BG, SEL, 0.14)            # what a surface in shadow is pulled to
 SKY_TOP, SKY_MID, SKY_LOW = tk.mix(BG, SEL, 0.1), tk.mix(BG, SEL, 0.55), tk.mix(SEL, BLUE, 0.4)
 TIERS = (tk.mix(BG, SEL, 0.5), tk.mix(BG, SEL, 0.72), tk.mix(SEL, BLUE, 0.14))  # the far city, near to far
 HAZE = tk.mix(SEL, BLUE, 0.1)
+HAZE_FAR = tk.mix(SEL, BLUE, 0.45)
 LINE = tk.mix(BG, SEL, 0.06)
 SKYLIGHT = P["blue"]
 RAIN = tk.mix(P["foreground"], P["bright_blue"], 0.35)
@@ -88,6 +90,13 @@ class Look:
     sky: tuple = (SKY_TOP, SKY_MID, SKY_LOW)  # top, middle and horizon of the sky's gradient
     far_dim: float = 0.45
     window_lines: float = 0.45
+    dress: object = None          # dress(pic, rng): draw on the data before painting: windows, marks
+    wobble: float = 0.0           # how far near edges wander from the ruler, in px
+    hesitate: bool = False        # lines overshoot or stop short at corners
+    cut: float = 1.2              # how soft the edge of the key's light on a surface is, in px
+    ring_bands: float = 0.0       # how far wet ground breaks the rings of the key's light into bands
+    air: tuple = ()               # the far city sinks into haze toward the ground: (below this height, amount)
+    rain_far: float = 0.0         # beyond this distance there is a little less rain; 0 for the same everywhere
     offset: float = 1000.0        # added to positions so the data render holds no negative numbers
     extra: dict = field(default_factory=dict)
 
@@ -319,7 +328,7 @@ def sky(pic, rng):
     return out
 
 
-def far_city(pic, out):
+def far_city(pic, out, rng):
     """The far city as stepped flat silhouettes: distance is a colour step, not fog. Its lit windows stay as marks."""
     lamb = pic.n @ np.array((-0.5, -0.6, 0.62), np.float32)
     at = pic.look.tier_at
@@ -328,6 +337,12 @@ def far_city(pic, out):
         m = pic.solid & (pic.dist >= at[k]) & (pic.dist < hi)
         tone = pt.mixa(np.broadcast_to(pt.rgb(colour), out.shape), pt.rgb(SKYLIGHT), np.where(lamb > 0.4, 0.1, 0.0))
         out = np.where(m[..., None], tone, out)
+    if pic.look.air:  # air: the foot of the far city is lost in tinted haze, in flat bands with a cut edge
+        z = pic.pos[..., 2] * (1 + 0.5 * (pt.noise(pic.shape, (40 * pic.k, 420 * pic.k), rng) - 0.5))
+        amount = np.zeros(pic.shape, np.float32)
+        for height, a in pic.look.air:
+            amount = np.where(z < height, a, amount)
+        out = pt.mixa(out, pt.rgb(HAZE_FAR), pt.blur(amount * pic.far, 1.5 * pic.k) * pic.far)
     return out
 
 
@@ -347,10 +362,13 @@ def surfaces(pic, rng):
     tone = pt.mixa(tone, pt.rgb(HAZE), veil * ~pic.flat)
     wobble = 1 + 0.16 * (pt.noise(pic.shape, 150 * k, rng) - 0.5)  # the rings are cut by hand, not by compass
     r = pic.r * wobble
+    if look.ring_bands:  # on wet ground the light lies in broken horizontal bands, not a compass curve
+        band = pt.noise(pic.shape, (6 * k, 260 * k), rng) - 0.5
+        r = np.where(pic.wet, r * (1 + look.ring_bands * band), r)
     f = np.zeros(pic.shape, np.float32)
     for edge, amount in zip(reversed(look.rings), reversed(look.amounts)):
         f = np.where(pic.lit & (r < edge), amount, f)
-    f = pt.blur(f, 1.2 * k)
+    f = pt.blur(f, look.cut * k)
     return pt.mixa(tone, pt.rgb(look.key_colour), f)
 
 
@@ -391,7 +409,8 @@ def lines(pic, out, rng, width=1.0):
     """Pen lines on silhouettes and creases, heaviest on the nearest things, gone on the far city."""
     k = pic.k
     reach = pic.look.tier_at[0]
-    e = pt.edges(1.0 / np.maximum(pic.depth, 0.1), pic.n, pic.solid)
+    across, down = pt.edges(1.0 / np.maximum(pic.depth, 0.1), pic.n, pic.solid, parts=True)
+    e = pt.hesitate(across, down, k, rng) if pic.look.hesitate else across | down
     if pic.flat.any():  # a flat shape keeps its outline and loses what is inside it
         inside = pic.flat.copy()
         for ax in (0, 1):
@@ -445,6 +464,10 @@ def rain(pic, out, rng):
     r = (pt.streaks(pic.shape, density, n, 30 * k, 0.16, rng)
          + pt.streaks(pic.shape, density, n // 2, 64 * k, 0.16, rng))
     r = pt.blur(np.clip(r, 0, 1), 0.5 * k) * (0.2 + 0.6 * halo)
+    tubes = sum((m for g, m in zip(pic.look.glows, pic.masks) if g.style == "tube"), np.zeros(pic.shape, np.float32))
+    r *= 1 - np.clip(pt.blur(tubes, 22 * k) * 12, 0, 1)  # the streaks stop at a tube and its tight halo
+    if pic.look.rain_far:
+        r *= np.where(pic.dist > pic.look.rain_far, 0.6, 1.0)
     return pt.mixa(out, pt.rgb(pic.look.rain_colour), np.clip(r * 1.2, 0, 0.5))
 
 
@@ -456,12 +479,77 @@ def finish(pic, out, rng, amount=0.014):
     return pt.grain(out, amount, rng)
 
 
+def wander(pic, out, rng):
+    """Near edges leave the ruler: the picture is pulled a pixel or two this way and that, slowly, and less with
+    distance, so a long straight edge has a hand's slight wave in it."""
+    k = pic.k
+    near = pt.blur(np.clip((150 - pic.dist) / 90, 0, 1), 12 * k) * pic.look.wobble * k * 2
+    dy = (pt.noise(pic.shape, 110 * k, rng) - 0.5) * near
+    dx = (pt.noise(pic.shape, 110 * k, rng) - 0.5) * near
+    return pt.warp(out, dy, dx)
+
+
+def walls(pic):
+    """Upright surfaces, with where each pixel is along its wall and which wall it is."""
+    ax, ay = np.abs(pic.n[..., 0]), np.abs(pic.n[..., 1])
+    side = ax > ay
+    along = np.where(side, pic.pos[..., 1], pic.pos[..., 0])
+    plane = np.floor(np.where(side, pic.pos[..., 0], pic.pos[..., 1]) + 0.5).astype(int) * 2 + side
+    return pic.solid & (np.abs(pic.n[..., 2]) < 0.3), along, plane
+
+
+def cells(pic, rng, bay, floor_h, ground, shift=1.0):
+    """A wall divided by hand: floors, and bays that start somewhere different on every floor. Gives each
+    pixel's place in its bay and floor (0 to 1), its floor number and eight chance numbers for its bay."""
+    upright, along, plane = walls(pic)
+    table = rng.random((61, 67, 8), dtype=np.float32)
+    v = (pic.pos[..., 2] - ground) / floor_h
+    j = np.floor(v).astype(int)
+    u = along / bay + table[(j + plane * 5) % 61, 0, 6] * shift
+    i = np.floor(u).astype(int)
+    return upright & (j >= 0), u - i, v - j, i, j, table[(i * 7 + plane * 13) % 61, (j + plane * 3) % 67]
+
+
+def windows(pic, rng, where, bay=3.3, floor_h=3.3, ground=3.6, part=0.55, warm=0.05, glass=None, edge=None,
+            lit=None):
+    """Windows on near walls as a painter puts them: not every bay, uneven in size and place, most of them a dark
+    rectangle with one light edge, a few lit flat and warm, some of those with a blind half down."""
+    ok, fu, fv, i, j, h = cells(pic, rng, bay, floor_h, ground)
+    w, t = 0.26 + 0.34 * h[..., 1], 0.3 + 0.3 * h[..., 2]
+    du, dv = fu - (0.5 + (h[..., 3] - 0.5) * 0.3), fv - (0.5 + (h[..., 4] - 0.5) * 0.2)
+    inside = ok & where & (h[..., 0] < part) & (np.abs(du) < w / 2) & (np.abs(dv) < t / 2)
+    on = inside & (h[..., 5] < warm)
+    sill = np.where(h[..., 6] < 0.5, dv < -t / 2 + 0.13 / floor_h, du < -w / 2 + 0.13 / bay)
+    pic.col = np.where(inside[..., None], pt.rgb(glass), pic.col)
+    pic.col = np.where((inside & sill & ~on)[..., None], pt.rgb(edge), pic.col)
+    blind = on & (h[..., 7] < 0.45) & (dv > -t * (h[..., 7] - 0.1))
+    pic.emit = np.where(on[..., None], pt.rgb(lit), pic.emit)
+    pic.emit = np.where(blind[..., None], pt.mixa(pt.rgb(lit), pt.rgb(glass), 0.45), pic.emit)
+    pic.glow = np.where(on, 1.0, pic.glow).astype(np.float32)
+    return inside
+
+
+def marks(pic, rng, where, bay=7.0, floor_h=4.2, ground=8.0, part=0.3, warm=0.14, cool=None, lit=None):
+    """Windows on far towers: small uneven dashes in loose clusters, most of them dim blue, a few warm."""
+    ok, fu, fv, i, j, h = cells(pic, rng, bay, floor_h, ground)
+    group = rng.random((23, 29), dtype=np.float32)[(i // 3) % 23, (j // 4) % 29]
+    w, t = 0.2 + 0.5 * h[..., 1], 0.16 + 0.2 * h[..., 2]
+    du, dv = fu - (0.5 + (h[..., 3] - 0.5) * 0.3), fv - (0.5 + (h[..., 4] - 0.5) * 0.4)
+    inside = ok & where & (h[..., 0] < part * 2 * group) & (np.abs(du) < w / 2) & (np.abs(dv) < t / 2)
+    on = h[..., 5] < warm
+    pic.emit = np.where(inside[..., None], np.where(on[..., None], pt.rgb(lit), pt.rgb(cool)), pic.emit)
+    pic.glow = np.where(inside, np.where(on, 1.0, 0.3 + 0.5 * h[..., 7]), pic.glow).astype(np.float32)
+    return inside
+
+
 def paint(d, look):
     rng = np.random.default_rng(look.seed)
     pic = Picture(d, look)
+    if look.dress:
+        look.dress(pic, np.random.default_rng(look.seed + 100))
     out = sky(pic, rng)
     out = np.where(pic.solid[..., None], surfaces(pic, rng), out)
-    out = far_city(pic, out)
+    out = far_city(pic, out, np.random.default_rng(look.seed + 300))
     out = lights(pic, out)
     out = pigment(pic, out, rng)
     if look.under:
@@ -469,6 +557,8 @@ def paint(d, look):
     out = smears(pic, out, rng)
     out = lines(pic, out, rng)
     out = lamps(pic, out)
+    if look.wobble:
+        out = wander(pic, out, np.random.default_rng(look.seed + 200))
     if look.over:
         out = look.over(pic, out, rng)
     out = rain(pic, out, rng)

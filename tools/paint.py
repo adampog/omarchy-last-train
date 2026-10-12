@@ -128,17 +128,56 @@ def kuwahara(a, r):
 
 # ---------- drawn things ----------
 
-def edges(inv_depth, normal, solid, thr_depth=0.02, thr_normal=0.2):
+def edges(inv_depth, normal, solid, thr_depth=0.02, thr_normal=0.2, parts=False):
     """Where a line belongs: silhouettes (a jump in depth), creases (a turn of the surface) and the skyline.
-    Uses the second difference of 1/depth, which is zero across any flat surface however steeply it is seen."""
-    e = np.zeros(inv_depth.shape, bool)
+    Uses the second difference of 1/depth, which is zero across any flat surface however steeply it is seen.
+    With `parts`, the lines that run across and the lines that run down are given separately."""
+    both = []
     for ax in (0, 1):
         a, b, c = np.roll(inv_depth, 1, ax), inv_depth, np.roll(inv_depth, -1, ax)
-        e |= np.abs(a + c - 2 * b) > thr_depth * b
+        e = np.abs(a + c - 2 * b) > thr_depth * b
         e |= (1 - (normal * np.roll(normal, 1, ax)).sum(-1)) > thr_normal
         e |= solid != np.roll(solid, 1, ax)
-    e[0], e[-1], e[:, 0], e[:, -1] = False, False, False, False
-    return e
+        e[0], e[-1], e[:, 0], e[:, -1] = False, False, False, False
+        both.append(e)
+    return tuple(both) if parts else both[0] | both[1]
+
+
+def corners(e, k):
+    """Where lines meet at an angle: both directions of slope are present close by."""
+    g = blur(e.astype(np.float32), 1.5 * k)
+    gy, gx = g - np.roll(g, 1, 0), g - np.roll(g, 1, 1)
+    a, b, c = blur(gx * gx, 3 * k), blur(gy * gy, 3 * k), blur(gx * gy, 3 * k)
+    return ((a * b - c * c) > 0.13 * (a + b) ** 2) & (a + b > 2e-4)
+
+
+def hesitate(across, down, k, rng):
+    """A hand's hesitation at corners: here a line runs a few pixels past the corner, there it stops short."""
+    e = across | down
+    c = corners(e, k).astype(np.float32)
+    choice = noise(e.shape, 70 * k, rng)
+    n = max(2, int(round(5 * k)))
+    grow = np.zeros(e.shape, bool)
+    for ax, own, other in ((1, across, down), (0, down, across)):
+        near = other.copy()
+        for s in (-1, 1):
+            near |= np.roll(other, s, 0) | np.roll(other, s, 1)
+        pure = own & ~near  # a run that is all one direction carries on the way it was going
+        for s in range(1, n + 1):
+            grow |= np.roll(pure, s, ax) | np.roll(pure, -s, ax)
+    e = e | (grow & (blur(c, 2.5 * k) > 0.04) & (choice > 0.6))
+    return e & ~((blur(c, 1.3 * k) > 0.2) & (choice < 0.34))
+
+
+def warp(a, dy, dx):
+    """The picture with every pixel taken from a little way off: (dy, dx) in pixels, smoothly sampled."""
+    h, w = a.shape[:2]
+    y = np.clip(np.arange(h, dtype=np.float32)[:, None] + dy, 0, h - 1.001)
+    x = np.clip(np.arange(w, dtype=np.float32)[None, :] + dx, 0, w - 1.001)
+    y0, x0 = y.astype(int), x.astype(int)
+    fy, fx = (y - y0)[..., None], (x - x0)[..., None]
+    return ((a[y0, x0] * (1 - fx) + a[y0, x0 + 1] * fx) * (1 - fy)
+            + (a[y0 + 1, x0] * (1 - fx) + a[y0 + 1, x0 + 1] * fx) * fy)
 
 
 def ink(e, weight, k, rng, width=1.0):
