@@ -47,6 +47,7 @@ G_AT = (2.35, 13.25, 2.3)
 KETTLE = (2.9, 13.9, 1.3)
 COUNTER_BOX = ((1.2, 13.6, 0.0), (3.8, 14.4, 1.0))
 FRONT_Y = 13.6
+FIELD1, FIELD2, FIELD3 = 0.19, 0.12, 0.06
 
 
 def build(rng):
@@ -91,6 +92,20 @@ def under(pic, out, rng):
     fade = np.clip((rows - 160 * k) / (480 * k), 0, 1)
     out = pt.mixa(out, pt.rgb(WARM_WALL), near * 0.8 * fade)
     out = pt.mixa(out, pt.rgb(WARM_STEP), step * 0.62 * fade)
+    # the lanterns' light as flat warm steps with cut edges, centred on the lantern row: inner step, outer step, and a
+    # faint third step as the air above the awning
+    lr, lc = pic.at(G_AT)
+    surf = pic.solid & (pic.dist < 60) & (pic.n[..., 2] < 0.7)
+    rr = rows + 0.16 * (cols - lc)  # the cut edges run slantwise, not level
+    hw1 = np.interp(rr, (lr - 200 * k, lr, lr + 300 * k, lr + 620 * k), (300 * k, 520 * k, 640 * k, 700 * k))
+    hw2 = np.interp(rr, (lr - 330 * k, lr, lr + 620 * k), (450 * k, 820 * k, 980 * k))
+    hw3 = np.interp(rr, (lr - 520 * k, lr - 200 * k), (260 * k, 420 * k))
+    in1 = (np.abs(cols - lc) < hw1) & (rr > lr - 200 * k) & (rr < lr + 620 * k)
+    in2 = (np.abs(cols - lc) < hw2) & (rr > lr - 330 * k) & (rr < lr + 620 * k)
+    in3 = (np.abs(cols - lc) < hw3) & (rr > lr - 520 * k) & (rr < lr - 200 * k) & (rr > 170 * k)
+    out = pt.mixa(out, pt.rgb(tk.mix(ORANGE, an.SEL, 0.3)), (surf * in3 * FIELD3 * np.clip((rows - 170 * k) / (260 * k), 0, 1)).astype(np.float32))
+    out = pt.mixa(out, pt.rgb(tk.mix(ORANGE, an.SEL, 0.3)), (surf * in2 * FIELD2).astype(np.float32))
+    out = pt.mixa(out, pt.rgb(tk.mix(ORANGE, PALE, 0.15)), (surf * in1 * FIELD1).astype(np.float32))
     # the left wall: one flat dark tone, then the drawn things (nothing soft and round)
     lw = left_wall(pic)
     out = pt.mixa(out, pt.rgb(LEFT_WALL), lw * 0.85 * np.clip((rows - 60 * k) / (500 * k), 0, 1))
@@ -116,18 +131,23 @@ def under(pic, out, rng):
     pool = gd & (((x - 2.3 + pw) / 2.6) ** 2 + ((y - 11.0 + pw) / 2.4) ** 2 < 1)
     out = pt.mixa(out, pt.rgb(POOL), pt.blur(pool.astype(np.float32), 5 * k) * 0.4)
     r0 = pic.at((2.3, 13.6, 0.0))[0]
-    strip = np.floor(np.maximum(rows - r0, 0) / (16 * k)).astype(int)
-    gap = rng.random(64)[strip % 64] < 0.55
     smear = np.zeros(pic.shape, np.float32)
-    sid = strip % 64
-    for i, (lx, power, reach_px) in enumerate(((1.45, 0.4, 560), (2.05, 0.4, 620), (2.65, 0.3, 330), (3.25, 0.4, 480))):
+    # a few long, uneven, broken smears under the four lanterns: none shares a row or a column line, the ones nearest the
+    # counter are brightest and longest
+    for lx in (1.45, 2.05, 2.65, 3.25):
         c = pic.at((lx, 13.25, 0.0))[1]
-        width = rng.uniform(34, 60, 64)[sid] * k
-        shift = rng.uniform(-30, 30, 64)[sid] * k
-        short = rng.uniform(0.5, 1.0, 64)[sid]
-        m = (np.abs(cols - c - shift) < width) * (rows > r0) * (1 - gap * 0.9) * np.clip(1.2 - (rows - r0) / (reach_px * k * short), 0, 1)
-        smear = np.maximum(smear, pt.blur(m.astype(np.float32), 4.5 * k) * (power / 0.4))
-    out = pt.mixa(out, pt.rgb(tk.mix(ORANGE, PALE, 0.25)), (smear * gd * 0.42).astype(np.float32))
+        off = 14.0
+        for j in range(3):
+            off += rng.uniform(34, 95)
+            if j and rng.random() < 0.3:
+                continue
+            fade = 1.0 - 0.28 * j
+            length = rng.uniform(130, 330) * fade * k
+            thick = rng.uniform(8, 15) * k
+            cx_ = c + rng.uniform(-70, 70) * k
+            m = (np.abs(cols - cx_) < length / 2) * (np.abs(rows - (r0 + off * k)) < thick / 2)
+            smear = np.maximum(smear, pt.blur(m.astype(np.float32), 1.4 * k) * fade)
+    out = pt.mixa(out, pt.rgb(tk.mix(ORANGE, PALE, 0.25)), (smear * gd * 0.38).astype(np.float32))
     # the alley's far end: one faint paler haze band at the foot of the end wall
     endw = pic.solid & (y > 60) & (pic.n[..., 1] < -0.5) & (z < 6.0)
     out = pt.mixa(out, pt.rgb(HAZE), (endw * np.clip(1 - z / 6.0, 0, 1) * 0.5).astype(np.float32))
