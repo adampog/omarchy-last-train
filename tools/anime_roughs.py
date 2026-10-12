@@ -215,6 +215,11 @@ LIT_TO = 0.2                                   # how far up a letter's face the 
 CITY_HAZE = tk.mix(tk.mix(ORANGE, P["brown"], 0.45), an.SEL, 0.25)  # the city's light in the air
 CITY_BAND = tk.mix(ORANGE, an.SEL, 0.3)                            # a lit band low on a tower's face
 HAZE_BANDS = ((1700.0, 0.05), (2600.0, 0.16), (4200.0, 0.3), (6200.0, 0.46))  # beyond this far, this much haze
+CARPET = tuple(tk.mix(an.BG, an.SEL, t) for t in (0.4, 0.5, 0.6, 0.7))  # the far city's tone in each of those
+GLOW_OVER = ((480.0, 620.0, 0.75), (2350.0, 380.0, 0.25))  # the glow's swells: column of 3440, width, amount
+CARPET_HAZE = 0.42                            # the towers take less of the glow than the air behind them
+LIT_WARM = tk.mix(tk.mix(CITY_HAZE, ORANGE, 0.2), PALE, 0.55)     # the letters' lit field takes the glow's tint
+LIT_TINT = 0.6
 BANDS = ((176.0, 185.0), (146.0, 152.0), (107.0, 113.0))  # each one's lit band, the lowest part of it in the frame
 # the nearest tall block at the bottom left and its two neighbours, as the city script places them with seed 1
 BLOCKS = (((-436.7, 862.1, 0.0), (-381.8, 913.8, 254.7)),
@@ -223,8 +228,9 @@ BLOCKS = (((-436.7, 862.1, 0.0), (-381.8, 913.8, 254.7)),
 
 
 def w_under(pic, out, rng):
-    """The ground between the towers as stepped blues, and the letters flat in two tones: a cool field where
-    the city's light reaches up them, a dark tone above, with their undersides pale and their left sides red."""
+    """The ground between the towers as stepped blues, the far city as a few flat masses under an uneven glow,
+    and the letters flat in two tones: a warm pale field where the city's light reaches up them and a dark
+    tone above, with their undersides pale."""
     k = pic.k
     rows = np.arange(pic.shape[0], dtype=np.float32)[:, None]
     away = float(w6.CAM.z) * pic.f / np.maximum(rows - pic.horizon, 1.0)  # how far off the ground in a row is
@@ -244,21 +250,36 @@ def w_under(pic, out, rng):
     # the city's own light in the air: a warm band lying on the horizon. The far city sinks into it in depth
     # bands, and it fades up into the blue of the sky.
     far = np.where(pic.solid, pic.dist, away)
-    haze = np.zeros(pic.shape, np.float32)
     edge = 1 + 0.25 * (pt.noise(pic.shape, (30 * k, 500 * k), rng) - 0.5)
+    # the far carpet as a few large flat masses, dark near and paler far, with no pale roof tops: beyond the
+    # middle distance each depth band is one tone and the blocks in it run together
+    carpet = pic.solid & ~word
+    for (beyond, _), tone, amount in zip(HAZE_BANDS, CARPET, (0.45, 0.8, 0.92, 1.0)):
+        out = np.where((carpet & (far * edge > beyond))[..., None], pt.mixa(out, pt.rgb(tone), amount), out)
+    haze = np.zeros(pic.shape, np.float32)
     for beyond, amount in HAZE_BANDS:
         haze = np.where(far * edge > beyond, amount, haze)
-    haze = pt.blur(haze, 3 * k)
-    up = HAZE_BANDS[-1][1] * np.exp(-np.maximum(pic.horizon - rows, 0) / (95 * k))
-    haze = np.where(rows < pic.horizon, np.broadcast_to(up, pic.shape), haze)
-    haze = np.clip(haze + 0.16 * np.exp(-np.abs(rows - pic.horizon) / (70 * k)), 0, 1) * ~word  # no line where they meet
+    haze = pt.blur(haze * np.where(carpet, CARPET_HAZE, 1.0), 3 * k)
+    # the glow is the city's, so it is uneven along the horizon: brightest over the big tower and the dense
+    # cluster at the left, thinner elsewhere, and its upper edge is ragged
+    cols = np.arange(pic.shape[1], dtype=np.float32)[None, :] / k
+    over = sum(amount * np.exp(-((cols - at) / wide) ** 2) for at, wide, amount in GLOW_OVER)
+    uneven = pt.noise(pic.shape, (400 * k, 260 * k), rng)[:1] - 0.5
+    ragged = pt.noise(pic.shape, (18 * k, 120 * k), rng) - 0.5
+    strength = np.clip(0.45 + over + 0.3 * uneven, 0.2, 1.45)
+    reach = 95 * k * np.clip(0.5 + 0.8 * over + 0.5 * uneven + 0.7 * ragged, 0.15, None)
+    up = HAZE_BANDS[-1][1] * strength * np.exp(-np.maximum(pic.horizon - rows, 0) / reach)
+    # below the horizon the swell fades in with distance, so the air and the last of the ground meet unseen
+    swell = 1 + (strength - 1) * np.clip((far - HAZE_BANDS[1][0]) / (HAZE_BANDS[-1][0] - HAZE_BANDS[1][0]), 0, 1)
+    haze = np.where(rows < pic.horizon, up, haze * swell)
+    haze = np.clip(haze + 0.16 * strength * np.exp(-np.abs(rows - pic.horizon) / (70 * k)), 0, 1) * ~word
     out = pt.mixa(out, pt.rgb(CITY_HAZE), haze)
     z = pic.pos[..., 2]
     lo, hi = z[word].min(), z[word].max()
     # one level shadow line at the same height on every letter: the city's light from below reaches a little
     # way up the face
     lit = (z - lo) / (hi - lo) < LIT_TO
-    cool = pt.rgb(tk.mix(tk.mix(w6.UPLIGHT, w6.LETTER, 0.3), an.SEL, 0.3))
+    cool = pt.rgb(tk.mix(tk.mix(tk.mix(w6.UPLIGHT, w6.LETTER, 0.3), an.SEL, 0.3), LIT_WARM, LIT_TINT))
     dark = pt.rgb(tk.mix(tk.mix(w6.LETTER, an.SEL, 0.5), an.BG, 0.45))
     tone = np.where(lit[..., None], cool, dark)
     # sides are one darker tone on every letter: the middle letters show no side, so none of them is red
