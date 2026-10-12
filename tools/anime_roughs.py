@@ -218,7 +218,7 @@ HAZE_BANDS = ((1700.0, 0.05), (2600.0, 0.16), (4200.0, 0.3), (6200.0, 0.46))  # 
 CARPET = tuple(tk.mix(an.BG, an.SEL, t) for t in (0.4, 0.5, 0.6, 0.7))  # the far city's tone in each of those
 GLOW_OVER = ((480.0, 620.0, 0.75), (2350.0, 380.0, 0.25))  # the glow's swells: column of 3440, width, amount
 CARPET_HAZE = 0.42                            # the towers take less of the glow than the air behind them
-LIT_WARM = tk.mix(tk.mix(CITY_HAZE, ORANGE, 0.2), PALE, 0.55)     # the letters' lit field takes the glow's tint
+LIT_WARM = tk.mix(tk.mix(CITY_HAZE, ORANGE, 0.5), PALE, 0.45)     # the letters' lit field takes the glow's tint
 LIT_TINT = 0.6
 BANDS = ((176.0, 185.0), (146.0, 152.0), (107.0, 113.0))  # each one's lit band, the lowest part of it in the frame
 # the nearest tall block at the bottom left and its two neighbours, as the city script places them with seed 1
