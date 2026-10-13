@@ -20,7 +20,7 @@ the shipped names; `python3 tools/build_preview.py` makes the three preview and 
 | `backgrounds/last-train-05-last-train.png` | `uv run tools/anime_e.py` | 67003e3 | 14 | 16 | 61b742c91a5e6a6fbcb6c618115a338060a0b177ccc742178daab7178f87718b | original code-made art: a three-car train on a viaduct over a canal, broken reflection bands |
 | `backgrounds/last-train-06-tunnel-mouth.png` | `uv run tools/anime_f.py` | 90de698 | 15 | 16 | 5904a5899275ba4d7ad9053edb6fbbb2436dccf145fc85f03a2ce7846c177d58 | original code-made art: a wet road bending into a lit tunnel under a stepped retaining wall |
 | `backgrounds/last-train-07-the-counter.png` | `uv run tools/anime_g.py` | 16c7dcf | 16 | 16 | 0d141dfe2ba942472bf88d05a87491a8ced82a3c0be2930adf9c8cc249f62514 | original code-made art: a night food stall in a wet alley, flat warm wall tone, kettle steam |
-| `backgrounds/last-train-08-omarchy-over-the-city.png` | `uv run tools/anime_roughs.py --scene 06 --percent 100` | d9fa22e | 1 | 16 | 9741d1d8d3617423a2e01e7463d0154658f833f38e67cd6afc7e4e1ca347fa2c | original code-made art: the Omarchy wordmark extruded over a city, painted in the same style (the mark itself is Omarchy's) |
+| `backgrounds/last-train-08-omarchy-over-the-city.png` | `uv run tools/anime_roughs.py --scene 06 --percent 100` | d9fa22e, word placed 2026-10-13 | 1 | 16 | e8e1be7d92efaf093df8a15e9ed20d338bd75f73874610fea19cc49435e087c6 | original code-made art: the Omarchy wordmark extruded over a city, painted in the same style (the mark itself is Omarchy's) |
 | `unlock.png` | `python3 tools/build_preview.py` | | | | 8fe93fd7cfb86b3e24ccb856bec9a8540892c42e270a76dc4ff9868ca2be9651 | the Omarchy wordmark in the accent colour, drawn from Omarchy's logo.svg |
 | `preview-unlock.png` | `python3 tools/build_preview.py` | | | | dcc6800174453b044d846f9a5e61b9faf21a8ebe1651813c28597ff2a0f917dc | the unlock image over the background colour with a padlock and a field, drawn as vector shapes |
 | `preview.png` | `python3 tools/build_preview.py` | | | | ccad1edf9561c6e719a9b93bb4ed22e281d96e3d85738d6670604c146400276f | the palette as an editor and a terminal, with background 05 in the art panel |
@@ -70,6 +70,14 @@ dev-qa made an independent run on 2026-10-13 from a fresh clone at 592f380 on th
 `backgrounds/last-train-03-riders-stop.png`, 2 pixels differed (at 579,1229 and 2122,1317), each by 1 of 255:
 AE 2 channel values, PSNR 116.84, and the file was 7 bytes smaller. The other seven backgrounds and the three
 preview and unlock images were identical (AE 0). The figures are in the mission's `slices/02-build/QA-EVIDENCE.md`.
+
+Background 08 was placed again after both of those runs, on 2026-10-13: its wordmark was cut at the right edge
+of a centred 16:9 crop (x 440 to 3000 of 3440), so the word was moved 130 px left and made 9 % smaller in
+`tools/bg6_wordmark.py` (`WORD_PX` 1900 to 1770, `WORD_W_PX` 2200 to 2000). It now spans x 761 to 2793, whole
+inside the crop, and every pixel outside the word's box equals the earlier file. The new file was rendered
+twice with `uv run tools/anime_roughs.py --scene 06 --percent 100`; both runs were byte-identical (AE 0), and
+the shipped 08 is those bytes. The two runs above compared the earlier 08 (sha256 9741d1d8...); the other ten
+files are unchanged since.
 
 So GPU renders can differ by a few pixels of sampling noise from run to run, even on one machine. The shipped
 files are the frozen bytes; a fresh render is a check, not a replacement.

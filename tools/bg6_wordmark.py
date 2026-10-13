@@ -50,7 +50,7 @@ PITCH = math.radians(6.0)
 LENS = 28
 RES = (3440, 1440)
 # the word: where its centre sits in the frame (px), how wide it is (px), its distance (m, along the ground)
-WORD_PX, WORD_W_PX, WORD_D = (1900, 650), 2200, 400.0
+WORD_PX, WORD_W_PX, WORD_D = (1770, 650), 2000, 400.0
 DEPTH, BEVEL = 6.0, 0.5   # letter thickness and edge bevel, m
 UP_W, RIM_W = 9.0e5, 2.5e6  # uplight and red rim, watts
 HAZE_D, GLOW = 0.0004, 0.00012  # haze at the ground (per m), the city's light in it
