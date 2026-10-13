@@ -18,7 +18,7 @@ Omarchy takes a theme's name from its folder name, so the folder must be named `
 as "Last Train". Copy or clone this repository to that folder:
 
 ```bash
-git clone <this repository> ~/.config/omarchy/themes/last-train
+git clone https://github.com/adampog/omarchy-last-train ~/.config/omarchy/themes/last-train
 omarchy theme set "Last Train"
 ```
 

@@ -69,7 +69,7 @@ dev-qa made an independent run on 2026-10-13 from a fresh clone at 592f380 on th
 (`tools/make_backgrounds.sh` took 2 min 34.7 s). Ten of the eleven files were byte-identical. In
 `backgrounds/last-train-03-riders-stop.png`, 2 pixels differed (at 579,1229 and 2122,1317), each by 1 of 255:
 AE 2 channel values, PSNR 116.84, and the file was 7 bytes smaller. The other seven backgrounds and the three
-preview and unlock images were identical (AE 0). The figures are in the mission's `slices/02-build/QA-EVIDENCE.md`.
+preview and unlock images were identical (AE 0).
 
 Background 08 was placed again after both of those runs, on 2026-10-13: its wordmark was cut at the right edge
 of a centred 16:9 crop (x 440 to 3000 of 3440), so the word was moved 130 px left and made 9 % smaller in
