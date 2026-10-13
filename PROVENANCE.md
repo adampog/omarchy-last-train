@@ -44,6 +44,30 @@ wet ground, steam as a thin low veil with a ragged cut edge that the street show
 and one even grain. All of it comes
 from seeded noise and the colours in `colors.toml`.
 
+## Regeneration check
+
+On 2026-10-13, `tools/make_backgrounds.sh <scratch dir>` rendered all eight backgrounds again at the script
+default samples (2 min 36 s on one RTX 3090 Ti), and `python3 tools/build_preview.py --out <scratch dir>` made
+the three preview and unlock images again. Each file was compared with the shipped file by ImageMagick
+`compare` (AE = pixels that differ; PSNR 120 is the value it prints for identical images) and by `cmp`:
+
+| File | AE | PSNR | Bytes |
+|---|---|---|---|
+| `backgrounds/last-train-01-rain-gate.png` | 0 | 120 | identical |
+| `backgrounds/last-train-02-moored-lantern.png` | 0 | 120 | identical |
+| `backgrounds/last-train-03-riders-stop.png` | 0 | 120 | identical |
+| `backgrounds/last-train-04-signal-roof.png` | 0 | 120 | identical |
+| `backgrounds/last-train-05-last-train.png` | 0 | 120 | identical |
+| `backgrounds/last-train-06-tunnel-mouth.png` | 0 | 120 | identical |
+| `backgrounds/last-train-07-the-counter.png` | 0 | 120 | identical |
+| `backgrounds/last-train-08-omarchy-over-the-city.png` | 0 | 120 | identical |
+| `preview.png` | 0 | | identical |
+| `unlock.png` | 0 | | identical |
+| `preview-unlock.png` | 0 | | identical |
+
+This run was identical on this machine. GPU renders on another machine or driver may differ by a few pixels of
+sampling noise, so the shipped files, not a fresh render, are the frozen bytes.
+
 ## Contrast
 
 `omarchy dev theme preview . --no-osc` on 2026-10-12 (it prints and applies nothing): mode dark, foreground
