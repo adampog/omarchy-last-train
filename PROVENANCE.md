@@ -65,8 +65,14 @@ the three preview and unlock images again. Each file was compared with the shipp
 | `unlock.png` | 0 | | identical |
 | `preview-unlock.png` | 0 | | identical |
 
-This run was identical on this machine. GPU renders on another machine or driver may differ by a few pixels of
-sampling noise, so the shipped files, not a fresh render, are the frozen bytes.
+dev-qa made an independent run on 2026-10-13 from a fresh clone at 592f380 on the same machine
+(`tools/make_backgrounds.sh` took 2 min 34.7 s). Ten of the eleven files were byte-identical. In
+`backgrounds/last-train-03-riders-stop.png`, 2 pixels differed (at 579,1229 and 2122,1317), each by 1 of 255:
+AE 2 channel values, PSNR 116.84, and the file was 7 bytes smaller. The other seven backgrounds and the three
+preview and unlock images were identical (AE 0). The figures are in the mission's `slices/02-build/QA-EVIDENCE.md`.
+
+So GPU renders can differ by a few pixels of sampling noise from run to run, even on one machine. The shipped
+files are the frozen bytes; a fresh render is a check, not a replacement.
 
 ## Contrast
 
@@ -75,7 +81,7 @@ sampling noise, so the shipped files, not a fresh render, are the frozen bytes.
 `tools/build_preview.py`, which refuses a palette below target: red and accent 5.57, green 10.51, yellow 11.06,
 blue 6.01, magenta 7.51, cyan 10.30, muted 5.70, bright_red 7.07, bright_green 13.77, bright_yellow 13.77,
 bright_blue 9.25, bright_magenta 10.02, bright_cyan 13.07, light_foreground 13.14, bright_foreground 16.83,
-dark_foreground 9.47, orange 9.44 (target 3.0 each; lowest 5.57).
+dark_foreground 9.47, orange 9.44, brown 5.86 (target 3.0 each; lowest 5.57).
 
 ## Colours
 
